@@ -397,13 +397,13 @@ export interface ToolDefinition {
 
 export interface ToolOption {
   id: string;
-  type: 'checkbox' | 'slider' | 'dropdown' | 'color' | 'number';
+  type: 'checkbox' | 'slider' | 'dropdown' | 'color' | 'text' | 'button-group';
   label: string;
   default: unknown;
   min?: number;
   max?: number;
   step?: number;
-  options?: string[];
+  options?: Array<{ value: string; label: string }>;
 }
 
 // ============================================================================

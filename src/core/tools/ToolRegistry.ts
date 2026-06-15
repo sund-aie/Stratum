@@ -539,7 +539,7 @@ export const photoshopTools: ToolDefinition[] = [
     description: 'Add horizontal text',
     options: [
       { id: 'fontFamily', type: 'dropdown', label: 'Font', default: 'Arial', options: ['Arial', 'Helvetica', 'Times New Roman', 'Georgia'] },
-      { id: 'fontSize', type: 'number', label: 'Size', default: 12 },
+      { id: 'fontSize', type: 'slider', label: 'Size', default: 12 },
       { id: 'alignment', type: 'dropdown', label: 'Alignment', default: 'Left', options: ['Left', 'Center', 'Right', 'Justify'] },
     ],
   },
@@ -552,7 +552,7 @@ export const photoshopTools: ToolDefinition[] = [
     description: 'Add vertical text',
     options: [
       { id: 'fontFamily', type: 'dropdown', label: 'Font', default: 'Arial', options: ['Arial', 'Helvetica', 'Times New Roman', 'Georgia'] },
-      { id: 'fontSize', type: 'number', label: 'Size', default: 12 },
+      { id: 'fontSize', type: 'slider', label: 'Size', default: 12 },
     ],
   },
   {
@@ -636,7 +636,7 @@ export const photoshopTools: ToolDefinition[] = [
       { id: 'toolMode', type: 'dropdown', label: 'Mode', default: 'Shape', options: ['Shape', 'Path', 'Pixels'] },
       { id: 'fill', type: 'color', label: 'Fill', default: '#000000' },
       { id: 'stroke', type: 'color', label: 'Stroke', default: '#000000' },
-      { id: 'strokeWidth', type: 'number', label: 'Stroke', default: 1 },
+      { id: 'strokeWidth', type: 'slider', label: 'Stroke', default: 1 },
     ],
   },
   {
@@ -1526,4 +1526,63 @@ export function getNextToolWithSameShortcut(currentToolId: string): ToolDefiniti
   const nextIndex = (currentIndex + 1) % toolsWithSameShortcut.length;
   
   return toolsWithSameShortcut[nextIndex];
+}
+
+// ============================================================================
+// EXPORTED TYPES AND CLASSES
+// ============================================================================
+
+export type ToolCategory = 'select' | 'crop' | 'retouch' | 'paint' | 'draw' | 'vector' | 'type' | 'navigate';
+
+export interface ToolOptionDef {
+  id: string;
+  type: 'slider' | 'checkbox' | 'dropdown' | 'color' | 'text' | 'button-group';
+  label: string;
+  default?: any;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: Array<{ value: string; label: string }>;
+  buttons?: Array<{ value: string; label: string; icon?: string; tooltip?: string }>;
+}
+
+export class ToolRegistry {
+  private tools: Map<string, ToolDefinition> = new Map();
+
+  constructor() {
+    // Initialize with all tools
+    for (const tool of allTools) {
+      this.tools.set(tool.id, tool);
+    }
+  }
+
+  getTool(id: string): ToolDefinition | undefined {
+    return this.tools.get(id);
+  }
+
+  getAllTools(): ToolDefinition[] {
+    return Array.from(this.tools.values());
+  }
+
+  getToolsByCategory(category: ToolCategory): ToolDefinition[] {
+    return Array.from(this.tools.values()).filter(tool => tool.category === category);
+  }
+
+  registerTool(tool: ToolDefinition): void {
+    this.tools.set(tool.id, tool);
+  }
+
+  unregisterTool(id: string): void {
+    this.tools.delete(id);
+  }
+}
+
+// Singleton instance
+let registryInstance: ToolRegistry | null = null;
+
+export function getToolRegistry(): ToolRegistry {
+  if (!registryInstance) {
+    registryInstance = new ToolRegistry();
+  }
+  return registryInstance;
 }
