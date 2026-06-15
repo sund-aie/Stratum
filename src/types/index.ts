@@ -1,30 +1,318 @@
 /**
- * Unified Canvas - Core Type Definitions
+ * Stratum - Unified Creative Suite
+ * Core type definitions for raster, vector, and photo editing
  */
 
-export interface Point {
-  x: number;
-  y: number;
+// ============================================================================
+// LAYER TYPES
+// ============================================================================
+
+export type LayerType = 'raster' | 'vector' | 'adjustment' | 'mask' | 'group';
+
+export interface BaseLayer {
+  id: string;
+  name: string;
+  type: LayerType;
+  visible: boolean;
+  locked: boolean;
+  opacity: number; // 0-1
+  blendMode: BlendMode;
+  order: number;
+  parentId?: string;
+  expanded?: boolean; // For groups
 }
 
-export interface Size {
+export interface RasterLayer extends BaseLayer {
+  type: 'raster';
   width: number;
   height: number;
+  pixelData?: ImageData;
+  source?: string; // URL or base64
 }
 
-export interface Rect {
+export interface VectorLayer extends BaseLayer {
+  type: 'vector';
+  paths: VectorPath[];
+  fill?: FillStyle;
+  stroke?: StrokeStyle;
+  effects?: VectorEffect[];
+}
+
+export interface AdjustmentLayer extends BaseLayer {
+  type: 'adjustment';
+  adjustmentType: AdjustmentType;
+  settings: AdjustmentSettings;
+  mask?: MaskData;
+}
+
+export interface MaskLayer extends BaseLayer {
+  type: 'mask';
+  targetLayerId: string;
+  maskData: MaskData;
+  inverted: boolean;
+}
+
+export interface GroupLayer extends BaseLayer {
+  type: 'group';
+  children: Layer[];
+}
+
+export type Layer = RasterLayer | VectorLayer | AdjustmentLayer | MaskLayer | GroupLayer;
+
+// ============================================================================
+// VECTOR TYPES
+// ============================================================================
+
+export interface VectorPath {
+  id: string;
+  closed: boolean;
+  points: AnchorPoint[];
+  fill?: FillStyle;
+  stroke?: StrokeStyle;
+}
+
+export interface AnchorPoint {
   x: number;
   y: number;
-  width: number;
-  height: number;
+  handleIn?: { x: number; y: number };
+  handleOut?: { x: number; y: number };
+  cornerType: 'smooth' | 'corner';
 }
 
-export interface Color {
-  r: number;
-  g: number;
-  b: number;
-  a: number;
+export interface FillStyle {
+  type: 'solid' | 'gradient' | 'pattern';
+  color?: RGBAColor;
+  gradient?: GradientData;
+  pattern?: PatternData;
+  opacity: number;
 }
+
+export interface StrokeStyle {
+  color: RGBAColor;
+  width: number;
+  dashArray?: number[];
+  lineCap: 'butt' | 'round' | 'square';
+  lineJoin: 'miter' | 'round' | 'bevel';
+  miterLimit: number;
+  opacity: number;
+}
+
+export interface GradientData {
+  type: 'linear' | 'radial' | 'angular';
+  stops: GradientStop[];
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
+export interface GradientStop {
+  offset: number; // 0-1
+  color: RGBAColor;
+}
+
+export interface PatternData {
+  id: string;
+  repeat: 'repeat' | 'reflect' | 'none';
+}
+
+export interface VectorEffect {
+  type: 'dropShadow' | 'innerShadow' | 'glow' | 'blur';
+  enabled: boolean;
+  settings: Record<string, number | RGBAColor>;
+}
+
+// ============================================================================
+// ADJUSTMENT TYPES (Photoshop/Lightroom adjustments)
+// ============================================================================
+
+export type AdjustmentType = 
+  | 'exposure'
+  | 'contrast'
+  | 'highlights'
+  | 'shadows'
+  | 'whites'
+  | 'blacks'
+  | 'vibrance'
+  | 'saturation'
+  | 'temperature'
+  | 'tint'
+  | 'hue'
+  | 'curves'
+  | 'levels'
+  | 'colorBalance'
+  | 'splitToning'
+  | 'hsl'
+  | 'sharpening'
+  | 'noiseReduction'
+  | 'vignette'
+  | 'dehaze'
+  | 'clarity'
+  | 'texture'
+  | 'invert'
+  | 'posterize'
+  | 'threshold'
+  | 'gradientMap';
+
+export interface AdjustmentSettings {
+  // Basic Lightroom-style adjustments
+  exposure?: number; // -10 to +10
+  contrast?: number; // -100 to +100
+  highlights?: number; // -100 to +100
+  shadows?: number; // -100 to +100
+  whites?: number; // -100 to +100
+  blacks?: number; // -100 to +100
+  vibrance?: number; // -100 to +100
+  saturationAdjust?: number; // -100 to +100 (renamed to avoid conflict)
+  temperature?: number; // -100 to +100
+  tint?: number; // -100 to +100
+  clarity?: number; // -100 to +100
+  dehaze?: number; // -100 to +100
+  texture?: number; // -100 to +100
+  
+  // HSL
+  hue?: HSLAdjustments;
+  saturationHSL?: HSLAdjustments; // Renamed to avoid conflict
+  luminance?: HSLAdjustments;
+  
+  // Curves
+  curves?: CurveChannels;
+  
+  // Levels
+  levels?: LevelChannels;
+  
+  // Color Balance
+  colorBalance?: ColorBalanceSettings;
+  
+  // Split Toning
+  splitToning?: SplitToningSettings;
+  
+  // Sharpening & Noise
+  sharpening?: SharpeningSettings;
+  noiseReduction?: NoiseReductionSettings;
+  
+  // Vignette
+  vignette?: VignetteSettings;
+  
+  // Special
+  invert?: boolean;
+  posterize?: number;
+  threshold?: number;
+  gradientMap?: GradientData;
+}
+
+export interface HSLAdjustments {
+  red: number;
+  orange: number;
+  yellow: number;
+  green: number;
+  aqua: number;
+  blue: number;
+  purple: number;
+  magenta: number;
+}
+
+export interface CurveChannels {
+  rgb: CurvePoint[];
+  red: CurvePoint[];
+  green: CurvePoint[];
+  blue: CurvePoint[];
+}
+
+export interface CurvePoint {
+  x: number; // 0-255
+  y: number; // 0-255
+}
+
+export interface LevelChannels {
+  rgb: LevelSettings;
+  red: LevelSettings;
+  green: LevelSettings;
+  blue: LevelSettings;
+}
+
+export interface LevelSettings {
+  inputLow: number;
+  inputMid: number;
+  inputHigh: number;
+  outputLow: number;
+  outputHigh: number;
+}
+
+export interface ColorBalanceSettings {
+  shadows: { r: number; g: number; b: number };
+  midtones: { r: number; g: number; b: number };
+  highlights: { r: number; g: number; b: number };
+  preserveLuminosity: boolean;
+}
+
+export interface SplitToningSettings {
+  highlights: { hue: number; saturation: number };
+  shadows: { hue: number; saturation: number };
+  balance: number;
+}
+
+export interface SharpeningSettings {
+  amount: number;
+  radius: number;
+  detail: number;
+  masking: number;
+}
+
+export interface NoiseReductionSettings {
+  luminance: number;
+  detail: number;
+  contrast: number;
+  color: number;
+  smoothness: number;
+}
+
+export interface VignetteSettings {
+  amount: number;
+  midpoint: number;
+  roundness: number;
+  feather: number;
+}
+
+// ============================================================================
+// MASK TYPES
+// ============================================================================
+
+export interface MaskData {
+  type: 'pixel' | 'vector' | 'gradient' | 'brush';
+  pixelData?: ImageData;
+  vectorPath?: VectorPath;
+  gradient?: GradientData;
+  inverted: boolean;
+}
+
+// ============================================================================
+// COLOR TYPES
+// ============================================================================
+
+export interface RGBAColor {
+  r: number; // 0-255
+  g: number; // 0-255
+  b: number; // 0-255
+  a: number; // 0-1
+}
+
+export interface HSVAColor {
+  h: number; // 0-360
+  s: number; // 0-100
+  v: number; // 0-100
+  a: number; // 0-1
+}
+
+export interface LABColor {
+  l: number; // 0-100
+  a: number; // -128 to +127
+  b: number; // -128 to +127
+}
+
+// ============================================================================
+// BLEND MODES
+// ============================================================================
 
 export type BlendMode =
   | 'normal'
@@ -42,319 +330,183 @@ export type BlendMode =
   | 'hue'
   | 'saturation'
   | 'color'
-  | 'luminosity';
+  | 'luminosity'
+  | 'passthrough';
 
-export type LayerType = 'raster' | 'vector' | 'text' | 'adjustment' | 'group';
+// ============================================================================
+// DOCUMENT & ARTBOARD
+// ============================================================================
 
-export interface Layer {
+export interface Document {
   id: string;
   name: string;
-  type: LayerType;
-  visible: boolean;
-  opacity: number;
-  blendMode: BlendMode;
-  locked: boolean;
-  mask?: ImageData;
-  data: LayerData;
-  bounds: Rect;
-  transform: TransformMatrix;
-  parentId?: string;
-  children?: string[];
-  adjustment?: AdjustmentData;
+  artboards: Artboard[];
+  activeArtboardId: string;
+  layers: Layer[];
+  history: HistoryState[];
+  historyIndex: number;
+  metadata: DocumentMetadata;
 }
 
-export interface LayerData {
-  // Raster layer
-  imageData?: ImageData;
-  canvas?: HTMLCanvasElement;
-  
-  // Vector layer
-  paths?: VectorPath[];
-  
-  // Text layer
-  text?: TextData;
-  
-  // Group layer
-  layerIds?: string[];
-}
-
-export interface VectorPath {
+export interface Artboard {
   id: string;
-  points: PathPoint[];
-  closed: boolean;
-  fill?: Color;
-  stroke?: Color;
-  strokeWidth: number;
-  strokeCap: 'butt' | 'round' | 'square';
-  strokeJoin: 'miter' | 'round' | 'bevel';
-  dashArray?: number[];
-}
-
-export interface PathPoint {
+  name: string;
   x: number;
   y: number;
-  type: 'corner' | 'smooth' | 'symmetric';
-  handleIn?: Point;
-  handleOut?: Point;
+  width: number;
+  height: number;
+  backgroundColor?: RGBAColor;
+  locked: boolean;
 }
 
-export interface TextData {
-  content: string;
-  fontFamily: string;
-  fontSize: number;
-  fontWeight: string;
-  fontStyle: string;
-  textAlign: 'left' | 'center' | 'right';
-  lineHeight: number;
-  letterSpacing: number;
-  fill: Color;
-  stroke?: Color;
-  strokeWidth: number;
-  bounds: Rect;
-  path?: VectorPath; // Text on path
+export interface DocumentMetadata {
+  createdAt: Date;
+  modifiedAt: Date;
+  version: string;
+  colorProfile: string;
+  bitsPerChannel: 8 | 16 | 32;
 }
 
-export interface AdjustmentData {
-  type: 'brightness-contrast' | 'curves' | 'levels' | 'hsl' | 'exposure' | 'vibrance' | 'color-balance';
-  params: Record<string, number>;
-  enabled: boolean;
-}
+// ============================================================================
+// HISTORY & UNDO
+// ============================================================================
 
-export interface TransformMatrix {
-  a: number; // scaleX
-  b: number; // shearY
-  c: number; // shearX
-  d: number; // scaleY
-  e: number; // translateX
-  f: number; // translateY
-}
-
-export interface Selection {
-  type: 'none' | 'marquee' | 'lasso' | 'magic-wand' | 'object';
-  path?: PathPoint[];
-  bounds?: Rect;
-  mask?: ImageData; // Feathered selection mask
-  feather: number;
-  antialias: boolean;
-  marchingAntsOffset: number;
-}
-
-export interface ToolOptions {
-  // Brush
-  brushSize: number;
-  brushHardness: number;
-  brushOpacity: number;
-  brushFlow: number;
-  brushSpacing: number;
-  brushShape: 'round' | 'square' | 'custom';
-  brushTexture?: HTMLImageElement;
-  brushDynamics: BrushDynamics;
-  
-  // Eraser
-  eraserSize: number;
-  eraserHardness: number;
-  
-  // Selection
-  selectionMode: 'new' | 'add' | 'subtract' | 'intersect';
-  selectionFeather: number;
-  selectionAntialias: boolean;
-  magicWandTolerance: number;
-  magicWandContiguous: boolean;
-  magicWandSampleAllLayers: boolean;
-  
-  // Pen
-  penMode: 'pen' | 'curvature' | 'freeform' | 'add-anchor' | 'delete-anchor' | 'convert-anchor';
-  
-  // Shape
-  shapeType: 'rect' | 'ellipse' | 'line' | 'polygon' | 'star' | 'custom';
-  shapeFill: Color;
-  shapeStroke: Color;
-  shapeStrokeWidth: number;
-  polygonSides: number;
-  starInset: number;
-  
-  // Text
-  fontFamily: string;
-  fontSize: number;
-  fontWeight: string;
-  fontStyle: string;
-  textAlign: 'left' | 'center' | 'right';
-  lineHeight: number;
-  letterSpacing: number;
-  
-  // Transform
-  transformMode: 'free' | 'perspective' | 'warp' | 'puppet';
-  maintainAspectRatio: boolean;
-  rotateAroundCenter: boolean;
-  
-  // Crop
-  cropRatio: 'free' | '1:1' | '4:5' | '16:9' | '9:16' | '3:2' | '2:3';
-  cropStraighten: number;
-  
-  // General
-  foregroundColor: Color;
-  backgroundColor: Color;
-}
-
-export interface BrushDynamics {
-  sizeJitter: number;
-  opacityJitter: number;
-  flowJitter: number;
-  angleJitter: number;
-  roundnessJitter: number;
-  scatter: number;
-  count: number;
-  countJitter: number;
-  textureScale: number;
-  textureDepth: number;
-  textureMode: 'multiply' | 'subtract' | 'overlay' | 'color-dodge' | 'color-burn';
-  wetEdges: boolean;
-  buildUp: boolean;
-  smoothing: number;
-  protectTexture: boolean;
-}
-
-export interface HistoryEntry {
+export interface HistoryState {
   id: string;
-  description: string;
+  name: string;
   timestamp: number;
-  beforeState: AppState | null;
-  afterState: AppState | null;
-  layerIds?: string[];
-  tool?: string;
+  snapshot?: Uint8ClampedArray;
+  layerStates?: Map<string, Layer>;
 }
 
-export interface AppState {
-  layers: Layer[];
-  activeLayerId: string | null;
-  selection: Selection;
-  canvasSize: Size;
+// ============================================================================
+// TOOL TYPES
+// ============================================================================
+
+export type ToolCategory = 'select' | 'crop' | 'slice' | 'navigation' | 'retouch' | 'paint' | 'draw' | 'type' | 'vector';
+
+export interface ToolDefinition {
+  id: string;
+  name: string;
+  category: ToolCategory;
+  icon: string;
+  shortcut: string;
+  description: string;
+  options: ToolOption[];
+}
+
+export interface ToolOption {
+  id: string;
+  type: 'checkbox' | 'slider' | 'dropdown' | 'color' | 'number';
+  label: string;
+  default: unknown;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+}
+
+// ============================================================================
+// SELECTION TYPES
+// ============================================================================
+
+export interface SelectionData {
+  type: 'rect' | 'ellipse' | 'polygon' | 'path' | 'magic';
+  bounds?: { x: number; y: number; width: number; height: number };
+  path?: VectorPath;
+  feather?: number;
+  antiAlias: boolean;
+}
+
+export interface TransformData {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  skewX: number;
+  skewY: number;
+}
+
+// ============================================================================
+// EVENT TYPES
+// ============================================================================
+
+export interface CanvasEvent {
+  type: 'mousedown' | 'mousemove' | 'mouseup' | 'dblclick' | 'wheel' | 'keydown' | 'keyup';
+  x: number;
+  y: number;
+  canvasX: number;
+  canvasY: number;
+  button?: number;
+  buttons?: number;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  delta?: number;
+  key?: string;
+}
+
+// ============================================================================
+// VIEWPORT & ZOOM
+// ============================================================================
+
+export interface ViewportState {
   zoom: number;
-  pan: Point;
-  tool: ToolType;
-  toolOptions: ToolOptions;
-  history: HistoryEntry[];
-  historyIndex: number;
-  guides: Guide[];
-  grid: GridSettings;
-  rulers: boolean;
+  panX: number;
+  panY: number;
+  rulerVisible: boolean;
+  gridVisible: boolean;
+  guidesVisible: boolean;
   snapToGrid: boolean;
   snapToGuides: boolean;
+  pixelPreview: boolean;
 }
 
 export interface Guide {
   id: string;
   orientation: 'horizontal' | 'vertical';
   position: number;
-  color: Color;
   locked: boolean;
+  color?: RGBAColor;
 }
 
-export interface GridSettings {
-  enabled: boolean;
-  size: number;
-  subdivisions: number;
-  color: Color;
-  style: 'lines' | 'dots';
+// ============================================================================
+// AI FEATURES (2026)
+// ============================================================================
+
+export interface AIFeatureRequest {
+  type: 'generativeFill' | 'generativeExpand' | 'generativeRemove' | 'neuralFilter' | 'selectSubject' | 'selectSky' | 'enhance';
+  prompt?: string;
+  selection?: SelectionData;
+  layerId?: string;
+  settings: Record<string, unknown>;
 }
 
-export type ToolType =
-  | 'select'
-  | 'move'
-  | 'marquee-rect'
-  | 'marquee-ellipse'
-  | 'marquee-single-row'
-  | 'marquee-single-col'
-  | 'lasso'
-  | 'lasso-polygon'
-  | 'lasso-magnetic'
-  | 'magic-wand'
-  | 'object-select'
-  | 'crop'
-  | 'slice'
-  | 'slice-select'
-  | 'eyedropper'
-  | 'color-sampler'
-  | 'ruler'
-  | 'note'
-  | 'count'
-  | 'brush'
-  | 'pencil'
-  | 'color-replacement'
-  | 'mixer-brush'
-  | 'eraser'
-  | 'background-eraser'
-  | 'magic-eraser'
-  | 'fill'
-  | 'gradient'
-  | 'paint-bucket'
-  | 'blur'
-  | 'sharpen'
-  | 'smudge'
-  | 'dodge'
-  | 'burn'
-  | 'sponge'
-  | 'pen'
-  | 'curvature-pen'
-  | 'freeform-pen'
-  | 'add-anchor'
-  | 'delete-anchor'
-  | 'convert-anchor'
-  | 'horizontal-type'
-  | 'vertical-type'
-  | 'horizontal-type-mask'
-  | 'vertical-type-mask'
-  | 'path-select'
-  | 'direct-select'
-  | 'rectangle'
-  | 'ellipse'
-  | 'triangle'
-  | 'polygon'
-  | 'line'
-  | 'custom-shape'
-  | 'hand'
-  | 'rotate-view'
-  | 'zoom';
-
-export interface KeyboardShortcut {
-  key: string;
-  ctrl?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-  meta?: boolean;
-  action: string;
-  description: string;
+export interface AIFeatureResult {
+  success: boolean;
+  data?: ImageData | VectorPath[] | MaskData;
+  error?: string;
 }
 
-export interface ExportOptions {
-  format: 'png' | 'jpeg' | 'webp' | 'svg' | 'pdf';
-  quality: number;
-  width?: number;
-  height?: number;
-  scale?: number;
-  transparent: boolean;
-  includeMetadata: boolean;
-  colorSpace: 'sRGB' | 'AdobeRGB' | 'P3';
+// ============================================================================
+// PERFORMANCE & GPU
+// ============================================================================
+
+export interface GPUCapabilities {
+  available: boolean;
+  maxTextureSize: number;
+  maxViewportDims: number;
+  supportsComputeShaders: boolean;
+  supportsFloatTextures: boolean;
+  vramGB: number;
 }
 
-export interface ProjectFile {
-  version: string;
-  name: string;
-  canvasSize: Size;
-  layers: Layer[];
-  guides: Guide[];
-  grid: GridSettings;
-  history: HistoryEntry[];
-  historyIndex: number;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface PerformanceMetrics {
-  fps: number;
-  frameTime: number;
-  renderTime: number;
-  layerCount: number;
-  pixelCount: number;
-  memoryUsage: number;
+export interface RenderSettings {
+  useGPU: boolean;
+  quality: 'draft' | 'preview' | 'final';
+  downsampleFactor: number;
+  liveRendering: boolean;
 }
