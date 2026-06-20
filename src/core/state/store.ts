@@ -189,6 +189,7 @@ type Subscriber = (state: AppState) => void;
 interface HistoryEntry {
   name: string;
   doc: Document;
+  selection: SelectionData | null;
 }
 
 export class Store {
@@ -198,7 +199,7 @@ export class Store {
   // Gesture-granular history (B9).
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
-  private pendingSnapshot: Document | null = null;
+  private pendingSnapshot: { doc: Document; selection: SelectionData | null } | null = null;
   private pendingName = '';
 
   constructor() {
@@ -232,13 +233,18 @@ export class Store {
   beginHistory(name: string): void {
     if (this.pendingSnapshot) return; // already inside a gesture; keep first snapshot
     if (!this.state.document) return;
-    this.pendingSnapshot = cloneDocument(this.state.document);
+    // selection objects are immutable once created, so a reference snapshot is safe.
+    this.pendingSnapshot = { doc: cloneDocument(this.state.document), selection: this.state.selection };
     this.pendingName = name;
   }
 
   commitHistory(nameOverride?: string): void {
     if (!this.pendingSnapshot) return;
-    this.undoStack.push({ name: nameOverride ?? this.pendingName, doc: this.pendingSnapshot });
+    this.undoStack.push({
+      name: nameOverride ?? this.pendingName,
+      doc: this.pendingSnapshot.doc,
+      selection: this.pendingSnapshot.selection,
+    });
     if (this.undoStack.length > this.state.preferences.undoLimit) {
       this.undoStack.shift();
     }
@@ -270,8 +276,8 @@ export class Store {
   undo(): void {
     if (this.undoStack.length === 0 || !this.state.document) return;
     const entry = this.undoStack.pop()!;
-    this.redoStack.push({ name: entry.name, doc: cloneDocument(this.state.document) });
-    this.state = { ...this.state, document: entry.doc };
+    this.redoStack.push({ name: entry.name, doc: cloneDocument(this.state.document), selection: this.state.selection });
+    this.state = { ...this.state, document: entry.doc, selection: entry.selection };
     this.syncHistoryMeta();
     this.notifySubscribers();
   }
@@ -279,8 +285,8 @@ export class Store {
   redo(): void {
     if (this.redoStack.length === 0 || !this.state.document) return;
     const entry = this.redoStack.pop()!;
-    this.undoStack.push({ name: entry.name, doc: cloneDocument(this.state.document) });
-    this.state = { ...this.state, document: entry.doc };
+    this.undoStack.push({ name: entry.name, doc: cloneDocument(this.state.document), selection: this.state.selection });
+    this.state = { ...this.state, document: entry.doc, selection: entry.selection };
     this.syncHistoryMeta();
     this.notifySubscribers();
   }
