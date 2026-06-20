@@ -53,6 +53,8 @@ export interface RenderInput {
   desktop: string;
   antsOffset: number;
   activeLayerId: string | null;
+  chrome?: string;
+  textColor?: string;
 }
 
 export class CanvasEngine {
@@ -155,6 +157,69 @@ export class CanvasEngine {
     this.drawSelectionAnts(input.selection, ab, vp.zoom, input.antsOffset);
     this.drawOverlay(input.overlay, ab, vp.zoom);
 
+    ctx.restore();
+
+    if (vp.rulerVisible) this.drawRulers(vp, ab, input.chrome ?? '#d4d0c8', input.textColor ?? '#000');
+  }
+
+  private drawRulers(vp: ViewportState, ab: Artboard, chrome: string, text: string): void {
+    const ctx = this.ctx;
+    const RH = 16;
+    const W = this.cssWidth;
+    const H = this.cssHeight;
+    ctx.save();
+    ctx.fillStyle = chrome;
+    ctx.fillRect(0, 0, W, RH);
+    ctx.fillRect(0, 0, RH, H);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, RH + 0.5);
+    ctx.lineTo(W, RH + 0.5);
+    ctx.moveTo(RH + 0.5, 0);
+    ctx.lineTo(RH + 0.5, H);
+    ctx.stroke();
+
+    ctx.fillStyle = text;
+    ctx.font = '9px Tahoma, sans-serif';
+    ctx.textBaseline = 'alphabetic';
+    const step = niceRulerStep(vp.zoom);
+    const toScreenX = (ax: number) => (ax + ab.x) * vp.zoom + vp.panX;
+    const toScreenY = (ay: number) => (ay + ab.y) * vp.zoom + vp.panY;
+
+    // top ruler
+    const axStart = Math.floor(((RH - vp.panX) / vp.zoom - ab.x) / step) * step;
+    for (let ax = axStart; ; ax += step) {
+      const sx = toScreenX(ax);
+      if (sx > W) break;
+      if (sx < RH) continue;
+      ctx.beginPath();
+      ctx.moveTo(sx + 0.5, RH - 6);
+      ctx.lineTo(sx + 0.5, RH);
+      ctx.stroke();
+      ctx.fillText(String(ax), sx + 2, 8);
+    }
+    // left ruler (rotated labels)
+    const ayStart = Math.floor(((RH - vp.panY) / vp.zoom - ab.y) / step) * step;
+    for (let ay = ayStart; ; ay += step) {
+      const sy = toScreenY(ay);
+      if (sy > H) break;
+      if (sy < RH) continue;
+      ctx.beginPath();
+      ctx.moveTo(RH - 6, sy + 0.5);
+      ctx.lineTo(RH, sy + 0.5);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(8, sy - 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(String(ay), 0, 0);
+      ctx.restore();
+    }
+    // corner box
+    ctx.fillStyle = chrome;
+    ctx.fillRect(0, 0, RH, RH);
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.strokeRect(0.5, 0.5, RH, RH);
     ctx.restore();
   }
 
@@ -594,6 +659,13 @@ export class CanvasEngine {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function niceRulerStep(zoom: number): number {
+  const target = 60 / zoom;
+  const cands = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  for (const c of cands) if (c >= target) return c;
+  return 10000;
+}
 
 /** Map a blend mode to a Canvas globalCompositeOperation (B10). */
 export function mapBlend(mode: BlendMode): GlobalCompositeOperation {

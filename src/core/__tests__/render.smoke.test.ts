@@ -28,7 +28,7 @@ function fakeCtx(canvas: any): any {
   const ctx: any = {
     canvas,
     setTransform() {}, clearRect() {}, fillRect() {}, strokeRect() {},
-    save() {}, restore() {}, translate() {}, scale() {}, rotate() {},
+    save() {}, restore() {}, translate() {}, scale() {}, rotate() {}, font: '',
     beginPath() {}, rect() {}, clip() {}, ellipse() {}, arc() {},
     moveTo() {}, lineTo() {}, bezierCurveTo() {}, closePath() {},
     stroke() {}, fill() {}, setLineDash() {}, drawImage() {}, putImageData() {},

@@ -80,10 +80,15 @@ function App() {
       getStore().dispatch({ type: alt ? 'SET_BACKGROUND' : 'SET_FOREGROUND', payload: c });
     controller.onRequestText = (x, y) => setDialog({ type: 'text', x, y });
 
-    // desktop color from theme token
+    // theme colors from tokens (desktop / ruler chrome / text)
     const refreshDesktop = () => {
-      const v = getComputedStyle(document.documentElement).getPropertyValue('--ps-desktop').trim();
-      controller.setDesktop(v || '#5d5d5d');
+      const cs = getComputedStyle(document.documentElement);
+      controller.setThemeColors(
+        cs.getPropertyValue('--ps-desktop').trim() || '#5d5d5d',
+        cs.getPropertyValue('--ps-chrome').trim() || '#d4d0c8',
+        cs.getPropertyValue('--ps-text').trim() || '#000'
+      );
+      controller.renderNow();
     };
     refreshDesktop();
 

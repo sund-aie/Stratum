@@ -137,8 +137,15 @@ export class InteractionController {
   // Rendering
   // -------------------------------------------------------------------------
 
+  private chrome = '#d4d0c8';
+  private textColor = '#000';
   setDesktop(color: string): void {
     this.desktop = color || this.desktop;
+  }
+  setThemeColors(desktop: string, chrome: string, text: string): void {
+    if (desktop) this.desktop = desktop;
+    if (chrome) this.chrome = chrome;
+    if (text) this.textColor = text;
   }
 
   requestRender = (): void => {
@@ -160,6 +167,8 @@ export class InteractionController {
       desktop: this.desktop,
       antsOffset: this.antsOffset,
       activeLayerId: s.activeLayerId,
+      chrome: this.chrome,
+      textColor: this.textColor,
     });
   }
 

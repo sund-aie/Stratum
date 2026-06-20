@@ -16,7 +16,7 @@ import {
   transparentImageData,
 } from './io/imageIO';
 import { exportDocument, saveProject, loadProject } from './io/exporter';
-import { rasterizeSelection } from './interaction/selection';
+import { rasterizeSelection, maskBounds as selBounds } from './interaction/selection';
 import { RasterOps } from './engine/RasterOps';
 import { Adjustments } from './engine/Adjustments';
 
@@ -35,6 +35,7 @@ export interface CommandCtx {
 }
 
 let lastSelection: SelectionData | null = null;
+let clipboard: { data: ImageData; x: number; y: number } | null = null;
 
 export function createCommands(ctx: CommandCtx) {
   const store = getStore();
@@ -150,6 +151,94 @@ export function createCommands(ctx: CommandCtx) {
           data[i + 3] = aa;
         }
         store.dispatch({ type: 'UPDATE_LAYER', payload: { id: layer.id, changes: {} } });
+      });
+    },
+
+    // ---- Clipboard (internal) ----
+    copySelection() {
+      const layer = activeLayer();
+      const ab = artboard();
+      if (!ab || !layer || layer.type !== 'raster' || !(layer as RasterLayer).pixelData) {
+        ui.toast('Copy needs a pixel layer');
+        return;
+      }
+      const src = (layer as RasterLayer).pixelData!;
+      const sel = store.getState().selection;
+      const mask = sel ? rasterizeSelection(sel, ab.width, ab.height) : null;
+      // bounds: selection bbox or whole layer
+      let bx = 0;
+      let by = 0;
+      let bw = src.width;
+      let bh = src.height;
+      if (mask) {
+        const b = selBounds(mask, ab.width, ab.height);
+        if (!b) {
+          ui.toast('Nothing to copy');
+          return;
+        }
+        bx = b.x;
+        by = b.y;
+        bw = b.width;
+        bh = b.height;
+      }
+      const out = new ImageData(bw, bh);
+      for (let y = 0; y < bh; y++) {
+        for (let x = 0; x < bw; x++) {
+          const sx = bx + x;
+          const sy = by + y;
+          if (sx >= src.width || sy >= src.height) continue;
+          if (mask && mask[sy * ab.width + sx] === 0) continue;
+          const si = (sy * src.width + sx) * 4;
+          const di = (y * bw + x) * 4;
+          out.data[di] = src.data[si];
+          out.data[di + 1] = src.data[si + 1];
+          out.data[di + 2] = src.data[si + 2];
+          out.data[di + 3] = src.data[si + 3];
+        }
+      }
+      clipboard = { data: out, x: bx, y: by };
+      ui.toast(`Copied ${bw}×${bh}`);
+    },
+    paste() {
+      const d = doc();
+      const ab = artboard();
+      if (!d || !ab || !clipboard) {
+        ui.toast('Clipboard is empty');
+        return;
+      }
+      const full = transparentImageData(ab.width, ab.height);
+      const cb = clipboard;
+      for (let y = 0; y < cb.data.height; y++) {
+        for (let x = 0; x < cb.data.width; x++) {
+          const dx = cb.x + x;
+          const dy = cb.y + y;
+          if (dx >= ab.width || dy >= ab.height) continue;
+          const si = (y * cb.data.width + x) * 4;
+          const di = (dy * ab.width + dx) * 4;
+          full.data[di] = cb.data.data[si];
+          full.data[di + 1] = cb.data.data[si + 1];
+          full.data[di + 2] = cb.data.data[si + 2];
+          full.data[di + 3] = cb.data.data[si + 3];
+        }
+      }
+      const layer = newRasterLayer('Pasted', ab.width, ab.height, d.layers.length, full);
+      store.commit('Paste', () => store.dispatch({ type: 'ADD_LAYER', payload: layer }));
+    },
+
+    // ---- Layer order ----
+    moveLayer(dir: 'up' | 'down') {
+      const d = doc();
+      const s = store.getState();
+      if (!d || !s.activeLayerId) return;
+      const sorted = [...d.layers].sort((a, b) => a.order - b.order);
+      const idx = sorted.findIndex((l) => l.id === s.activeLayerId);
+      const swapWith = dir === 'up' ? idx + 1 : idx - 1;
+      if (idx < 0 || swapWith < 0 || swapWith >= sorted.length) return;
+      store.commit(dir === 'up' ? 'Bring Forward' : 'Send Backward', () => {
+        const a = sorted[idx];
+        const b = sorted[swapWith];
+        store.dispatch({ type: 'UPDATE_LAYER', payload: { id: a.id, changes: { order: b.order } } });
+        store.dispatch({ type: 'UPDATE_LAYER', payload: { id: b.id, changes: { order: a.order } } });
       });
     },
 

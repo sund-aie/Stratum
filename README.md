@@ -45,7 +45,8 @@ CS2 glyphs — there are no emoji anywhere in the UI.
 | Type (point text layer, font/size/color) | ✅ |
 | Adjustment layers (non-destructive, over composite-beneath): Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Vibrance, Saturation, Temperature, Tint, Clarity, Dehaze, Texture, Curves, Levels, HSL, Color Balance, Split Toning, Vignette, Invert, Posterize, Threshold, Gradient Map | ✅ algorithms wired; live sliders for the basic set |
 | Destructive filters: Gaussian Blur, Sharpen, Reduce Noise, Invert, Desaturate | ✅ |
-| Layers panel (add/delete/duplicate/visibility/lock/opacity/blend), Merge Down, Flatten | ✅ |
+| Layers panel (add/delete/duplicate/reorder/visibility/lock/opacity/blend), Merge Down, Flatten | ✅ |
+| Internal Copy / Paste of a selection (Ctrl+C / Ctrl+V), Rulers (View ▸ Rulers) | ✅ |
 | History panel + gesture-granular undo/redo (one step per gesture) | ✅ |
 | Color picker (HSV square + hue + RGB/Hex), Color/Swatches panel | ✅ |
 | Foreground/background swatches, X swap, D defaults, Quick Mask toggle | ✅ |

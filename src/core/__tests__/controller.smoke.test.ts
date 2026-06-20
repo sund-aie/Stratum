@@ -26,7 +26,7 @@ function fakeCtx(canvas: any): any {
   return {
     canvas,
     setTransform() {}, clearRect() {}, fillRect() {}, strokeRect() {}, save() {}, restore() {},
-    translate() {}, scale() {}, beginPath() {}, rect() {}, clip() {}, ellipse() {}, arc() {},
+    translate() {}, scale() {}, rotate() {}, beginPath() {}, rect() {}, clip() {}, ellipse() {}, arc() {},
     moveTo() {}, lineTo() {}, bezierCurveTo() {}, closePath() {}, stroke() {}, fill() {},
     setLineDash() {}, drawImage() {}, putImageData() {}, fillText() {},
     createLinearGradient: () => ({ addColorStop() {} }),

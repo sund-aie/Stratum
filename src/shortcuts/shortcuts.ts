@@ -124,6 +124,14 @@ export function installShortcuts(commands: Commands, controller: InteractionCont
           e.preventDefault();
           commands.duplicateLayer();
           return;
+        case 'c':
+          e.preventDefault();
+          commands.copySelection();
+          return;
+        case 'v':
+          e.preventDefault();
+          commands.paste();
+          return;
         case 't':
           e.preventDefault();
           commands.ui.toast('Free Transform: drag the layer with Move; full transform handles coming online');

@@ -78,7 +78,7 @@ const defaultViewport: ViewportState = {
   zoom: 1,
   panX: 0,
   panY: 0,
-  rulerVisible: true,
+  rulerVisible: false,
   gridVisible: false,
   guidesVisible: true,
   snapToGrid: false,

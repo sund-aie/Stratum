@@ -119,7 +119,14 @@ export const LayersPanel: React.FC = () => {
         ))}
       </div>
 
-      <div className="row" style={{ justifyContent: 'flex-end', gap: 3, marginTop: 4 }}>
+      <div className="row" style={{ gap: 3, marginTop: 4 }}>
+        <div className="mini-btn bevel-out" title="Send Backward" onClick={() => commands.moveLayer('down')}>
+          <Icon name="chevronDown" size={13} />
+        </div>
+        <div className="mini-btn bevel-out" title="Bring Forward" onClick={() => commands.moveLayer('up')}>
+          <span style={{ transform: 'rotate(180deg)', display: 'flex' }}><Icon name="chevronDown" size={13} /></span>
+        </div>
+        <div className="spacer" />
         <div className="mini-btn bevel-out" title="New Adjustment Layer" onClick={() => commands.addAdjustmentLayer('exposure')}>
           <Icon name="layerAdjust" size={14} />
         </div>
