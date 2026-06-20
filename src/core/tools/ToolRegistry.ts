@@ -3,7 +3,7 @@
  * Implements all Photoshop, Illustrator, and Lightroom tools from the 2026 workflow guide
  */
 
-import type { ToolDefinition, ToolOption, SelectionData, VectorPath, AnchorPoint } from '../../types';
+import type { ToolDefinition, ToolOption, ToolCategory, SelectionData, VectorPath, AnchorPoint } from '../../types';
 
 // ============================================================================
 // PHOTOSHOP TOOLS
@@ -1532,19 +1532,10 @@ export function getNextToolWithSameShortcut(currentToolId: string): ToolDefiniti
 // EXPORTED TYPES AND CLASSES
 // ============================================================================
 
-export type ToolCategory = 'select' | 'crop' | 'retouch' | 'paint' | 'draw' | 'vector' | 'type' | 'navigate';
-
-export interface ToolOptionDef {
-  id: string;
-  type: 'slider' | 'checkbox' | 'dropdown' | 'color' | 'text' | 'button-group';
-  label: string;
-  default?: any;
-  min?: number;
-  max?: number;
-  step?: number;
-  options?: Array<{ value: string; label: string }>;
-  buttons?: Array<{ value: string; label: string; icon?: string; tooltip?: string }>;
-}
+// Single source of truth for these types lives in types/index.ts. Re-export so existing
+// imports (`import { type ToolCategory } from '.../ToolRegistry'`) keep working but stay unified.
+export type { ToolCategory };
+export type ToolOptionDef = ToolOption;
 
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();

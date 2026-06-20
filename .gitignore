@@ -1,4 +1,3 @@
-```gitignore
 # Dependencies
 node_modules/
 
@@ -7,23 +6,10 @@ dist/
 build/
 target/
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.py.class
-.Python
-env/
-venv/
-.venv/
-.ENV
-.python-version
-
 # Logs
 *.log
 
-# Environment specific
+# Environment
 .env
 .env.local
 .env.*
@@ -35,10 +21,6 @@ venv/
 *.swp
 *.swo
 *~
-```
 
-Wait, I need to reconsider. Looking at the file changes, they are all TypeScript/React source files (.tsx, .ts) and no build artifacts, dependency directories, or temporary files are present in the changes. Following rule #6, since the changes contain only source/config files and no build artifacts or dependencies, I should output an empty .gitignore.
-
-```gitignore
-
-```
+# OS
+.DS_Store

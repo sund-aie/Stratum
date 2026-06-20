@@ -1,23 +1,49 @@
 /**
  * Stratum State Management
- * Centralized state store using a simple pub/sub pattern
+ * Centralized state store using a simple pub/sub pattern.
+ *
+ * History is gesture-granular (B9): rapid per-move mutations no longer create
+ * undo states. Use beginHistory()/commitHistory() (or commit(name, fn)) to record
+ * exactly one undo step per gesture/command. Snapshots are deep clones that preserve
+ * ImageData and typed arrays via structuredClone.
  */
 
-import type { Document, Layer, ViewportState, ToolDefinition, SelectionData, Guide } from '../../types';
+import type {
+  Document,
+  Layer,
+  ViewportState,
+  ToolDefinition,
+  SelectionData,
+  Guide,
+  RGBAColor,
+} from '../../types';
 
 // ============================================================================
 // STATE INTERFACES
 // ============================================================================
 
+export type ThemeName = 'cs2' | 'modern';
+
 export interface AppState {
   document: Document | null;
   activeTool: string;
+  activeLayerId: string | null;
   tools: ToolDefinition[];
   viewport: ViewportState;
   selection: SelectionData | null;
   guides: Guide[];
   panels: PanelState;
   preferences: Preferences;
+  foreground: RGBAColor;
+  background: RGBAColor;
+  /** Controlled tool options: toolOptions[toolId][optionId] = value. (B4) */
+  toolOptions: Record<string, Record<string, unknown>>;
+  quickMask: boolean;
+  theme: ThemeName;
+  /** Names of undo entries for the History panel; index 0 = oldest. */
+  historyEntries: string[];
+  /** Pointer into historyEntries; equals historyEntries.length when at the live tip. */
+  historyPointer: number;
 }
 
 export interface PanelState {
@@ -72,12 +98,20 @@ export function createDefaultState(): AppState {
   return {
     document: null,
     activeTool: 'move',
+    activeLayerId: null,
     tools: [],
-    viewport: defaultViewport,
+    viewport: { ...defaultViewport },
     selection: null,
     guides: [],
-    panels: defaultPanelState,
-    preferences: defaultPreferences,
+    panels: { ...defaultPanelState },
+    preferences: { ...defaultPreferences },
+    foreground: { r: 0, g: 0, b: 0, a: 1 },
+    background: { r: 255, g: 255, b: 255, a: 1 },
+    toolOptions: {},
+    quickMask: false,
+    theme: 'cs2',
+    historyEntries: [],
+    historyPointer: 0,
   };
 }
 
@@ -92,6 +126,7 @@ export type Action =
   | { type: 'REMOVE_LAYER'; payload: string }
   | { type: 'UPDATE_LAYER'; payload: { id: string; changes: Partial<Layer> } }
   | { type: 'REORDER_LAYERS'; payload: { layerIds: string[] } }
+  | { type: 'SET_ACTIVE_LAYER'; payload: string | null }
   | { type: 'SET_ACTIVE_TOOL'; payload: string }
   | { type: 'REGISTER_TOOLS'; payload: ToolDefinition[] }
   | { type: 'UPDATE_VIEWPORT'; payload: Partial<ViewportState> }
@@ -101,8 +136,49 @@ export type Action =
   | { type: 'UPDATE_GUIDE'; payload: { id: string; changes: Partial<Guide> } }
   | { type: 'TOGGLE_PANEL'; payload: keyof PanelState }
   | { type: 'UPDATE_PREFERENCES'; payload: Partial<Preferences> }
+  | { type: 'SET_FOREGROUND'; payload: RGBAColor }
+  | { type: 'SET_BACKGROUND'; payload: RGBAColor }
+  | { type: 'SWAP_COLORS' }
+  | { type: 'RESET_COLORS' }
+  | { type: 'SET_TOOL_OPTION'; payload: { toolId: string; optionId: string; value: unknown } }
+  | { type: 'TOGGLE_QUICK_MASK' }
+  | { type: 'SET_THEME'; payload: ThemeName }
   | { type: 'UNDO' }
   | { type: 'REDO' };
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Deep clone a document, preserving ImageData / typed arrays / Dates / Maps. */
+export function cloneDocument(doc: Document): Document {
+  try {
+    return structuredClone(doc);
+  } catch {
+    // Fallback for environments without structuredClone: hand-clone ImageData.
+    return manualCloneDocument(doc);
+  }
+}
+
+function manualCloneDocument(doc: Document): Document {
+  const cloneLayer = (layer: Layer): Layer => {
+    const copy: any = { ...layer };
+    if ('pixelData' in layer && (layer as any).pixelData) {
+      const src = (layer as any).pixelData as ImageData;
+      copy.pixelData = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
+    }
+    if ('paths' in layer && Array.isArray((layer as any).paths)) {
+      copy.paths = JSON.parse(JSON.stringify((layer as any).paths));
+    }
+    if ((layer as any).settings) copy.settings = JSON.parse(JSON.stringify((layer as any).settings));
+    return copy as Layer;
+  };
+  return {
+    ...doc,
+    layers: doc.layers.map(cloneLayer),
+    artboards: doc.artboards.map((a) => ({ ...a })),
+  };
+}
 
 // ============================================================================
 // STORE CLASS
@@ -110,17 +186,24 @@ export type Action =
 
 type Subscriber = (state: AppState) => void;
 
+interface HistoryEntry {
+  name: string;
+  doc: Document;
+}
+
 export class Store {
   private state: AppState;
   private subscribers: Set<Subscriber>;
-  private history: AppState[];
-  private historyIndex: number;
+
+  // Gesture-granular history (B9).
+  private undoStack: HistoryEntry[] = [];
+  private redoStack: HistoryEntry[] = [];
+  private pendingSnapshot: Document | null = null;
+  private pendingName = '';
 
   constructor() {
     this.state = createDefaultState();
     this.subscribers = new Set();
-    this.history = [];
-    this.historyIndex = -1;
   }
 
   getState(): AppState {
@@ -129,81 +212,108 @@ export class Store {
 
   subscribe(subscriber: Subscriber): () => void {
     this.subscribers.add(subscriber);
-    return () => this.subscribers.delete(subscriber);
+    return () => {
+      this.subscribers.delete(subscriber);
+    };
   }
 
-  dispatch(action: Action): void {
-    // Save state for undo before certain actions
-    if (this.shouldSaveHistory(action.type)) {
-      this.saveHistory();
-    }
-
+  dispatch = (action: Action): void => {
     const newState = this.reduce(this.state, action);
-    
     if (newState !== this.state) {
       this.state = newState;
       this.notifySubscribers();
     }
+  };
+
+  // -------------------------------------------------------------------------
+  // History API (B9) — one undo step per gesture/command.
+  // -------------------------------------------------------------------------
+
+  beginHistory(name: string): void {
+    if (this.pendingSnapshot) return; // already inside a gesture; keep first snapshot
+    if (!this.state.document) return;
+    this.pendingSnapshot = cloneDocument(this.state.document);
+    this.pendingName = name;
   }
 
-  private shouldSaveHistory(actionType: string): boolean {
-    const historyActions = [
-      'ADD_LAYER',
-      'REMOVE_LAYER',
-      'UPDATE_LAYER',
-      'REORDER_LAYERS',
-      'SET_SELECTION',
-    ];
-    return historyActions.includes(actionType);
+  commitHistory(nameOverride?: string): void {
+    if (!this.pendingSnapshot) return;
+    this.undoStack.push({ name: nameOverride ?? this.pendingName, doc: this.pendingSnapshot });
+    if (this.undoStack.length > this.state.preferences.undoLimit) {
+      this.undoStack.shift();
+    }
+    this.redoStack = [];
+    this.pendingSnapshot = null;
+    this.syncHistoryMeta();
+    this.notifySubscribers();
   }
 
-  private saveHistory(): void {
-    // Remove any future states if we're not at the end
-    if (this.historyIndex < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIndex + 1);
-    }
+  cancelHistory(): void {
+    this.pendingSnapshot = null;
+  }
 
-    // Clone and save current state
-    const clonedState = JSON.parse(JSON.stringify(this.state));
-    this.history.push(clonedState);
+  /** Convenience wrapper: snapshot, run mutations, commit one undo step. */
+  commit(name: string, fn: () => void): void {
+    this.beginHistory(name);
+    fn();
+    this.commitHistory(name);
+  }
 
-    // Limit history size
-    if (this.history.length > this.state.preferences.undoLimit) {
-      this.history.shift();
-    } else {
-      this.historyIndex++;
-    }
+  private syncHistoryMeta(): void {
+    this.state = {
+      ...this.state,
+      historyEntries: this.undoStack.map((e) => e.name),
+      historyPointer: this.undoStack.length,
+    };
   }
 
   undo(): void {
-    if (this.historyIndex >= 0) {
-      const previousState = this.history[this.historyIndex];
-      this.historyIndex--;
-      this.state = previousState;
-      this.notifySubscribers();
-    }
+    if (this.undoStack.length === 0 || !this.state.document) return;
+    const entry = this.undoStack.pop()!;
+    this.redoStack.push({ name: entry.name, doc: cloneDocument(this.state.document) });
+    this.state = { ...this.state, document: entry.doc };
+    this.syncHistoryMeta();
+    this.notifySubscribers();
   }
 
   redo(): void {
-    if (this.historyIndex < this.history.length - 1) {
-      this.historyIndex++;
-      const nextState = this.history[this.historyIndex];
-      this.state = nextState;
-      this.notifySubscribers();
-    }
+    if (this.redoStack.length === 0 || !this.state.document) return;
+    const entry = this.redoStack.pop()!;
+    this.undoStack.push({ name: entry.name, doc: cloneDocument(this.state.document) });
+    this.state = { ...this.state, document: entry.doc };
+    this.syncHistoryMeta();
+    this.notifySubscribers();
   }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  // -------------------------------------------------------------------------
 
   private reduce(state: AppState, action: Action): AppState {
     switch (action.type) {
-      case 'SET_DOCUMENT':
-        return { ...state, document: action.payload };
+      case 'SET_DOCUMENT': {
+        // Fresh document resets history.
+        this.undoStack = [];
+        this.redoStack = [];
+        this.pendingSnapshot = null;
+        const firstLayer = action.payload.layers[0];
+        return {
+          ...state,
+          document: action.payload,
+          activeLayerId: firstLayer ? firstLayer.id : null,
+          historyEntries: [],
+          historyPointer: 0,
+        };
+      }
 
       case 'UPDATE_DOCUMENT':
         if (!state.document) return state;
-        return {
-          ...state,
-          document: { ...state.document, ...action.payload },
-        };
+        return { ...state, document: { ...state.document, ...action.payload } };
 
       case 'ADD_LAYER':
         if (!state.document) return state;
@@ -213,17 +323,23 @@ export class Store {
             ...state.document,
             layers: [...state.document.layers, action.payload],
           },
+          activeLayerId: action.payload.id,
         };
 
-      case 'REMOVE_LAYER':
+      case 'REMOVE_LAYER': {
         if (!state.document) return state;
+        const remaining = state.document.layers.filter((l) => l.id !== action.payload);
         return {
           ...state,
-          document: {
-            ...state.document,
-            layers: state.document.layers.filter((l) => l.id !== action.payload),
-          },
+          document: { ...state.document, layers: remaining },
+          activeLayerId:
+            state.activeLayerId === action.payload
+              ? remaining.length
+                ? remaining[remaining.length - 1].id
+                : null
+              : state.activeLayerId,
         };
+      }
 
       case 'UPDATE_LAYER':
         if (!state.document) return state;
@@ -239,10 +355,25 @@ export class Store {
           },
         };
 
-      case 'REORDER_LAYERS':
+      case 'REORDER_LAYERS': {
         if (!state.document) return state;
-        // Implement layer reordering logic
-        return state;
+        const order = action.payload.layerIds;
+        const byId = new Map(state.document.layers.map((l) => [l.id, l]));
+        const reordered = order
+          .map((id, i) => {
+            const l = byId.get(id);
+            return l ? ({ ...l, order: i } as Layer) : null;
+          })
+          .filter((l): l is Layer => l !== null);
+        // keep any layers not mentioned (defensive)
+        for (const l of state.document.layers) {
+          if (!order.includes(l.id)) reordered.push(l);
+        }
+        return { ...state, document: { ...state.document, layers: reordered } };
+      }
+
+      case 'SET_ACTIVE_LAYER':
+        return { ...state, activeLayerId: action.payload };
 
       case 'SET_ACTIVE_TOOL':
         return { ...state, activeTool: action.payload };
@@ -251,10 +382,7 @@ export class Store {
         return { ...state, tools: action.payload };
 
       case 'UPDATE_VIEWPORT':
-        return {
-          ...state,
-          viewport: { ...state.viewport, ...action.payload },
-        };
+        return { ...state, viewport: { ...state.viewport, ...action.payload } };
 
       case 'SET_SELECTION':
         return { ...state, selection: action.payload };
@@ -263,35 +391,57 @@ export class Store {
         return { ...state, guides: [...state.guides, action.payload] };
 
       case 'REMOVE_GUIDE':
-        return {
-          ...state,
-          guides: state.guides.filter((g) => g.id !== action.payload),
-        };
+        return { ...state, guides: state.guides.filter((g) => g.id !== action.payload) };
 
       case 'UPDATE_GUIDE':
         return {
           ...state,
           guides: state.guides.map((guide) =>
-            guide.id === action.payload.id
-              ? { ...guide, ...action.payload.changes }
-              : guide
+            guide.id === action.payload.id ? { ...guide, ...action.payload.changes } : guide
           ),
         };
 
       case 'TOGGLE_PANEL':
         return {
           ...state,
-          panels: {
-            ...state.panels,
-            [action.payload]: !state.panels[action.payload],
-          },
+          panels: { ...state.panels, [action.payload]: !state.panels[action.payload] },
         };
 
       case 'UPDATE_PREFERENCES':
+        return { ...state, preferences: { ...state.preferences, ...action.payload } };
+
+      case 'SET_FOREGROUND':
+        return { ...state, foreground: action.payload };
+
+      case 'SET_BACKGROUND':
+        return { ...state, background: action.payload };
+
+      case 'SWAP_COLORS':
+        return { ...state, foreground: state.background, background: state.foreground };
+
+      case 'RESET_COLORS':
         return {
           ...state,
-          preferences: { ...state.preferences, ...action.payload },
+          foreground: { r: 0, g: 0, b: 0, a: 1 },
+          background: { r: 255, g: 255, b: 255, a: 1 },
         };
+
+      case 'SET_TOOL_OPTION': {
+        const { toolId, optionId, value } = action.payload;
+        return {
+          ...state,
+          toolOptions: {
+            ...state.toolOptions,
+            [toolId]: { ...(state.toolOptions[toolId] || {}), [optionId]: value },
+          },
+        };
+      }
+
+      case 'TOGGLE_QUICK_MASK':
+        return { ...state, quickMask: !state.quickMask };
+
+      case 'SET_THEME':
+        return { ...state, theme: action.payload };
 
       case 'UNDO':
         this.undo();
@@ -325,7 +475,7 @@ export function getStore(): Store {
 }
 
 // ============================================================================
-// REACT HOOK
+// REACT HOOKS
 // ============================================================================
 
 import { useState, useEffect } from 'react';
@@ -338,6 +488,8 @@ export function useStore(): AppState {
     const unsubscribe = store.subscribe((newState) => {
       setState({ ...newState });
     });
+    // sync immediately in case state changed between render and effect
+    setState({ ...store.getState() });
     return unsubscribe;
   }, []);
 
@@ -346,5 +498,5 @@ export function useStore(): AppState {
 
 export function useDispatch() {
   const store = getStore();
-  return (action: Action) => store.dispatch(action);
+  return store.dispatch;
 }

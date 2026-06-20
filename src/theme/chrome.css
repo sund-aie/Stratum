@@ -1,0 +1,740 @@
+/* ==========================================================================
+   Stratum CS2 chrome — bevels, panels, toolbox, menus, inputs.
+   All colors come from tokens.css; switching data-theme reskins everything.
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--ps-font);
+  font-size: var(--ps-font-size);
+  color: var(--ps-text);
+  background: var(--ps-desktop);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+}
+
+/* ---- Bevels ------------------------------------------------------------- */
+.bevel-out {
+  border-top: 1px solid var(--ps-bevel-light);
+  border-left: 1px solid var(--ps-bevel-light);
+  border-right: 1px solid var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+  box-shadow: inset -1px -1px 0 var(--ps-bevel-dark), inset 1px 1px 0 var(--ps-chrome-2);
+}
+.bevel-in {
+  border-top: 1px solid var(--ps-bevel-shadow);
+  border-left: 1px solid var(--ps-bevel-shadow);
+  border-right: 1px solid var(--ps-bevel-light);
+  border-bottom: 1px solid var(--ps-bevel-light);
+  box-shadow: inset 1px 1px 0 var(--ps-bevel-dark);
+}
+.bevel-thin-out {
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top-color: var(--ps-bevel-light);
+  border-left-color: var(--ps-bevel-light);
+}
+.groove {
+  border-top: 1px solid var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-light);
+}
+
+/* ---- App shell ---------------------------------------------------------- */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--ps-chrome);
+  overflow: hidden;
+}
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.app-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ---- Title bar ---------------------------------------------------------- */
+.titlebar {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  background: linear-gradient(180deg, #2a4a8a, #1d3a72);
+  color: #fff;
+  font-weight: bold;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+:root[data-theme='modern'] .titlebar {
+  background: linear-gradient(180deg, #323232, #232323);
+}
+.titlebar .app-name {
+  font-weight: bold;
+}
+.titlebar .doc-name {
+  opacity: 0.85;
+  font-weight: normal;
+}
+
+/* ---- Menu bar ----------------------------------------------------------- */
+.menubar {
+  display: flex;
+  align-items: stretch;
+  height: 20px;
+  background: var(--ps-menu-bg);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 50;
+}
+.menu-item {
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--ps-text);
+  cursor: default;
+  height: 100%;
+}
+.menu-item:hover,
+.menu-item.open {
+  background: var(--ps-menu-hover);
+  color: var(--ps-menu-hover-text);
+}
+.menu-dropdown {
+  position: absolute;
+  top: 20px;
+  min-width: 220px;
+  background: var(--ps-chrome);
+  padding: 2px;
+  z-index: 100;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
+}
+.menu-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 20px;
+  padding: 0 10px 0 22px;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: default;
+  position: relative;
+}
+.menu-row .shortcut {
+  margin-left: auto;
+  color: var(--ps-text-dim);
+  padding-left: 24px;
+}
+.menu-row:hover:not(.disabled) {
+  background: var(--ps-menu-hover);
+  color: var(--ps-menu-hover-text);
+}
+.menu-row:hover:not(.disabled) .shortcut {
+  color: #dfe7f5;
+}
+.menu-row.disabled {
+  color: var(--ps-disabled);
+}
+.menu-row .check {
+  position: absolute;
+  left: 6px;
+}
+.menu-sep {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-light);
+}
+
+/* ---- Options bar -------------------------------------------------------- */
+.options-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px;
+  background: var(--ps-chrome);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+  box-shadow: inset 0 1px 0 var(--ps-bevel-light);
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+.options-bar .opt-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.options-bar .opt-label {
+  font-size: 11px;
+  color: var(--ps-text);
+}
+.opt-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--ps-bevel-shadow);
+  border-right: 1px solid var(--ps-bevel-light);
+}
+.tool-preset-well {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 4px;
+  background: var(--ps-chrome);
+}
+
+/* ---- Toolbox ------------------------------------------------------------ */
+.toolbox {
+  width: calc(var(--ps-tool-size) + 8px);
+  background: var(--ps-chrome);
+  border-right: 1px solid var(--ps-bevel-shadow);
+  box-shadow: inset -1px 0 0 var(--ps-bevel-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 0;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.toolbox.dbl {
+  width: calc(var(--ps-tool-size) * 2 + 10px);
+}
+.toolbox-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+.tool-btn {
+  width: var(--ps-tool-size);
+  height: var(--ps-tool-size);
+  margin: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ps-chrome);
+  color: var(--ps-text);
+  border: 1px solid transparent;
+  cursor: default;
+  position: relative;
+}
+.tool-btn:hover {
+  border-top: 1px solid var(--ps-bevel-light);
+  border-left: 1px solid var(--ps-bevel-light);
+  border-right: 1px solid var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+}
+.tool-btn.active {
+  background: var(--ps-tool-active-bg);
+  border-top: 1px solid var(--ps-bevel-shadow);
+  border-left: 1px solid var(--ps-bevel-shadow);
+  border-right: 1px solid var(--ps-bevel-light);
+  border-bottom: 1px solid var(--ps-bevel-light);
+}
+.tool-btn .flyout-mark {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-bottom: 4px solid var(--ps-text-dim);
+}
+.tool-sep {
+  width: 70%;
+  height: 1px;
+  margin: 3px 0;
+  background: var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-light);
+}
+.tool-flyout {
+  position: absolute;
+  left: calc(var(--ps-tool-size) + 8px);
+  background: var(--ps-chrome);
+  padding: 2px;
+  z-index: 200;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+.flyout-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  cursor: default;
+}
+.flyout-row:hover {
+  background: var(--ps-menu-hover);
+  color: var(--ps-menu-hover-text);
+}
+.flyout-row .shortcut {
+  margin-left: auto;
+  color: var(--ps-text-dim);
+}
+.flyout-row:hover .shortcut {
+  color: #dfe7f5;
+}
+
+/* ---- Color swatches / toolbox footer ------------------------------------ */
+.color-controls {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  margin: 6px 0 2px;
+}
+.swatch {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+.swatch.fg {
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+.swatch.bg {
+  bottom: 0;
+  right: 0;
+  z-index: 1;
+}
+.swatch-mini {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 11px;
+  height: 11px;
+  cursor: pointer;
+}
+.swatch-swap {
+  position: absolute;
+  top: -3px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  color: var(--ps-text);
+}
+.toolbox-toggles {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+}
+.mini-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ps-chrome);
+  cursor: pointer;
+  color: var(--ps-text);
+}
+.mini-btn.active {
+  background: var(--ps-tool-active-bg);
+}
+
+/* ---- Palettes (docked, tabbed) ------------------------------------------ */
+.dock {
+  width: 232px;
+  background: var(--ps-chrome);
+  border-left: 1px solid var(--ps-bevel-shadow);
+  box-shadow: inset 1px 0 0 var(--ps-bevel-light);
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.palette-group {
+  margin: 0 0 4px;
+  background: var(--ps-chrome);
+}
+.palette-title {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  background: linear-gradient(180deg, var(--ps-titlebar-from), var(--ps-titlebar-to));
+  border-top: 1px solid var(--ps-bevel-light);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+  color: var(--ps-titlebar-text);
+  font-size: 11px;
+  font-weight: bold;
+  cursor: default;
+}
+.palette-title .gripper {
+  width: 100%;
+  height: 6px;
+  margin-right: 6px;
+  background-image: repeating-linear-gradient(
+    var(--ps-bevel-light) 0 1px,
+    transparent 1px 2px,
+    var(--ps-bevel-shadow) 2px 3px,
+    transparent 3px 4px
+  );
+  opacity: 0.001;
+}
+.palette-title .collapse-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.palette-tabs {
+  display: flex;
+  align-items: flex-end;
+  height: 20px;
+  background: var(--ps-chrome);
+  padding-left: 2px;
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+}
+.palette-tab {
+  padding: 2px 10px 3px;
+  font-size: 11px;
+  background: var(--ps-tab-inactive);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-bottom: none;
+  border-top-left-radius: 2px;
+  border-top-right-radius: 2px;
+  margin-right: 2px;
+  color: var(--ps-text-dim);
+  cursor: default;
+  position: relative;
+  top: 1px;
+}
+.palette-tab.active {
+  background: var(--ps-tab-active);
+  color: var(--ps-text);
+  border-top: 1px solid var(--ps-bevel-light);
+  top: 0;
+  padding-bottom: 4px;
+}
+.palette-body {
+  background: var(--ps-chrome-2);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top: none;
+  padding: 4px;
+}
+
+/* ---- Generic rows / inputs ---------------------------------------------- */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--ps-row-h);
+}
+.row .label {
+  font-size: 11px;
+  color: var(--ps-text);
+}
+.spacer {
+  margin-left: auto;
+}
+input[type='text'].ps-input,
+input[type='number'].ps-input,
+.ps-input {
+  height: 18px;
+  background: var(--ps-input-bg);
+  border: 1px solid var(--ps-input-border);
+  border-top-color: var(--ps-bevel-dark);
+  border-left-color: var(--ps-bevel-dark);
+  color: var(--ps-text);
+  font-family: var(--ps-font);
+  font-size: 11px;
+  padding: 0 4px;
+  outline: none;
+}
+select.ps-select {
+  height: 19px;
+  background: var(--ps-chrome-2);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top-color: var(--ps-bevel-light);
+  border-left-color: var(--ps-bevel-light);
+  color: var(--ps-text);
+  font-family: var(--ps-font);
+  font-size: 11px;
+  outline: none;
+}
+.ps-btn {
+  height: 20px;
+  min-width: 22px;
+  padding: 0 8px;
+  background: var(--ps-chrome);
+  color: var(--ps-text);
+  font-family: var(--ps-font);
+  font-size: 11px;
+  cursor: default;
+  border-top: 1px solid var(--ps-bevel-light);
+  border-left: 1px solid var(--ps-bevel-light);
+  border-right: 1px solid var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.ps-btn:active,
+.ps-btn.active {
+  border-top: 1px solid var(--ps-bevel-shadow);
+  border-left: 1px solid var(--ps-bevel-shadow);
+  border-right: 1px solid var(--ps-bevel-light);
+  border-bottom: 1px solid var(--ps-bevel-light);
+}
+.ps-btn:disabled,
+.ps-btn.disabled {
+  color: var(--ps-disabled);
+  cursor: default;
+}
+.ps-checkbox {
+  width: 13px;
+  height: 13px;
+  background: var(--ps-input-bg);
+  border: 1px solid var(--ps-input-border);
+  border-top-color: var(--ps-bevel-dark);
+  border-left-color: var(--ps-bevel-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ps-text);
+  flex: 0 0 auto;
+}
+
+/* Native range restyle to a CS2 slider */
+input[type='range'].ps-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type='range'].ps-range::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--ps-input-bg);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top-color: var(--ps-bevel-dark);
+}
+input[type='range'].ps-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px;
+  width: 9px;
+  height: 13px;
+  background: var(--ps-chrome);
+  border-top: 1px solid var(--ps-bevel-light);
+  border-left: 1px solid var(--ps-bevel-light);
+  border-right: 1px solid var(--ps-bevel-shadow);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+}
+input[type='range'].ps-range::-moz-range-thumb {
+  width: 9px;
+  height: 13px;
+  border-radius: 0;
+  background: var(--ps-chrome);
+  border: 1px solid var(--ps-bevel-shadow);
+}
+
+/* ---- Button group (segmented) ------------------------------------------- */
+.btn-group {
+  display: inline-flex;
+}
+.btn-group .seg {
+  width: 22px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ps-chrome);
+  border-top: 1px solid var(--ps-bevel-light);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+  border-right: 1px solid var(--ps-bevel-shadow);
+  cursor: default;
+  font-size: 11px;
+}
+.btn-group .seg:first-child {
+  border-left: 1px solid var(--ps-bevel-light);
+}
+.btn-group .seg.active {
+  background: var(--ps-tool-active-bg);
+  border-top: 1px solid var(--ps-bevel-shadow);
+  border-left: 1px solid var(--ps-bevel-shadow);
+}
+
+/* ---- List rows (layers/history/swatches) -------------------------------- */
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--ps-row-h);
+  padding: 0 4px;
+  cursor: default;
+  color: var(--ps-text);
+}
+.list-row.selected {
+  background: var(--ps-accent);
+  color: var(--ps-accent-text);
+}
+.icon-btn {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ps-text);
+  flex: 0 0 auto;
+}
+.list-row.selected .icon-btn {
+  color: var(--ps-accent-text);
+}
+
+/* ---- Document area / canvas --------------------------------------------- */
+.doc-area {
+  flex: 1;
+  position: relative;
+  background: var(--ps-desktop);
+  overflow: hidden;
+}
+.doc-area canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.statusbar {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  background: var(--ps-chrome);
+  border-top: 1px solid var(--ps-bevel-light);
+  box-shadow: inset 0 1px 0 var(--ps-bevel-shadow);
+  font-size: 11px;
+  color: var(--ps-text);
+  flex: 0 0 auto;
+}
+.statusbar .zoom-field {
+  width: 52px;
+}
+.statusbar .sep {
+  width: 1px;
+  height: 14px;
+  background: var(--ps-bevel-shadow);
+}
+.status-hint {
+  color: var(--ps-text-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---- Dialogs / modal ---------------------------------------------------- */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+}
+.dialog {
+  background: var(--ps-chrome);
+  min-width: 300px;
+  box-shadow: 3px 3px 12px rgba(0, 0, 0, 0.5);
+  border-top: 1px solid var(--ps-bevel-light);
+  border-left: 1px solid var(--ps-bevel-light);
+  border-right: 1px solid var(--ps-bevel-dark);
+  border-bottom: 1px solid var(--ps-bevel-dark);
+}
+.dialog-title {
+  height: 20px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: linear-gradient(180deg, #2a4a8a, #1d3a72);
+  color: #fff;
+  font-weight: bold;
+  font-size: 11px;
+}
+.dialog-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+/* ---- Scrollbars (CS2-ish) ----------------------------------------------- */
+::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ps-chrome-2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--ps-chrome);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top-color: var(--ps-bevel-light);
+  border-left-color: var(--ps-bevel-light);
+}
+::-webkit-scrollbar-button {
+  display: block;
+  height: 16px;
+  background: var(--ps-chrome);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top-color: var(--ps-bevel-light);
+  border-left-color: var(--ps-bevel-light);
+}
+
+.dim {
+  color: var(--ps-text-dim);
+}
+.muted {
+  opacity: 0.5;
+}
+.section-label {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--ps-text-dim);
+  margin: 6px 0 3px;
+}

@@ -110,64 +110,67 @@ export class ToolEngine {
   }
 
   handleMagicWand(event: CanvasEvent, imageData: ImageData): SelectionData | null {
-    if (event.type !== 'click') return null;
-    
-    const tolerance = this.getToolOption('magicWand', 'tolerance', 32);
-    const contiguous = this.getToolOption('magicWand', 'contiguous', true);
-    
+    // B6: fire on mousedown (the union has no 'click').
+    if (event.type !== 'mousedown') return null;
+
+    const W = imageData.width;
+    const H = imageData.height;
     const startX = Math.floor(event.canvasX);
     const startY = Math.floor(event.canvasY);
-    const idx = (startY * imageData.width + startX) * 4;
-    
-    const targetR = imageData.data[idx];
-    const targetG = imageData.data[idx + 1];
-    const targetB = imageData.data[idx + 2];
-    
-    const mask = new Uint8Array(imageData.width * imageData.height);
-    const visited = new Uint8Array(imageData.width * imageData.height);
-    const queue: [number, number][] = [[startX, startY]];
-    
-    while (queue.length > 0) {
-      const [x, y] = queue.shift()!;
-      const visIdx = y * imageData.width + x;
-      
-      if (visited[visIdx]) continue;
-      visited[visIdx] = 1;
-      
-      const pIdx = (y * imageData.width + x) * 4;
-      const dR = Math.abs(imageData.data[pIdx] - targetR);
-      const dG = Math.abs(imageData.data[pIdx + 1] - targetG);
-      const dB = Math.abs(imageData.data[pIdx + 2] - targetB);
-      
-      if (dR + dG + dB <= tolerance) {
-        mask[visIdx] = 1;
-        
-        if (contiguous) {
-          if (x > 0) queue.push([x - 1, y]);
-          if (x < imageData.width - 1) queue.push([x + 1, y]);
-          if (y > 0) queue.push([x, y - 1]);
-          if (y < imageData.height - 1) queue.push([x, y + 1]);
-        }
+    if (startX < 0 || startY < 0 || startX >= W || startY >= H) return null;
+
+    const tolerance = this.getToolOption('magicWand', 'tolerance', 32);
+    const contiguous = this.getToolOption('magicWand', 'contiguous', true);
+
+    const data = imageData.data;
+    const sIdx = (startY * W + startX) * 4;
+    const targetR = data[sIdx];
+    const targetG = data[sIdx + 1];
+    const targetB = data[sIdx + 2];
+    const targetA = data[sIdx + 3];
+
+    // Mask in 0/255 form so it can drive marching ants + clipping directly. (B6)
+    const mask = new Uint8Array(W * H);
+    // Compare against a per-channel tolerance band (max-channel distance), nicer than a raw sum.
+    const within = (i: number): boolean => {
+      const p = i * 4;
+      return (
+        Math.abs(data[p] - targetR) <= tolerance &&
+        Math.abs(data[p + 1] - targetG) <= tolerance &&
+        Math.abs(data[p + 2] - targetB) <= tolerance &&
+        Math.abs(data[p + 3] - targetA) <= tolerance
+      );
+    };
+
+    if (contiguous) {
+      // B8: explicit typed-array stack instead of Array.shift() (which is O(n)).
+      const stack = new Int32Array(W * H);
+      let sp = 0;
+      const visited = new Uint8Array(W * H);
+      stack[sp++] = startY * W + startX;
+      visited[startY * W + startX] = 1;
+      while (sp > 0) {
+        const i = stack[--sp];
+        if (!within(i)) continue;
+        mask[i] = 255;
+        const x = i % W;
+        const y = (i / W) | 0;
+        if (x > 0 && !visited[i - 1]) { visited[i - 1] = 1; stack[sp++] = i - 1; }
+        if (x < W - 1 && !visited[i + 1]) { visited[i + 1] = 1; stack[sp++] = i + 1; }
+        if (y > 0 && !visited[i - W]) { visited[i - W] = 1; stack[sp++] = i - W; }
+        if (y < H - 1 && !visited[i + W]) { visited[i + W] = 1; stack[sp++] = i + W; }
       }
+    } else {
+      const n = W * H;
+      for (let i = 0; i < n; i++) if (within(i)) mask[i] = 255;
     }
-    
-    if (!contiguous) {
-      for (let y = 0; y < imageData.height; y++) {
-        for (let x = 0; x < imageData.width; x++) {
-          const pIdx = (y * imageData.width + x) * 4;
-          const dR = Math.abs(imageData.data[pIdx] - targetR);
-          const dG = Math.abs(imageData.data[pIdx + 1] - targetG);
-          const dB = Math.abs(imageData.data[pIdx + 2] - targetB);
-          if (dR + dG + dB <= tolerance) {
-            mask[y * imageData.width + x] = 1;
-          }
-        }
-      }
-    }
-    
+
     return {
       type: 'magic',
-      antiAlias: true,
+      antiAlias: this.getToolOption('magicWand', 'antiAlias', true),
+      mask,
+      maskWidth: W,
+      maskHeight: H,
     };
   }
 

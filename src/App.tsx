@@ -1,185 +1,274 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { getStore, useDispatch, useStore } from './core/state/store';
-import type { Document } from './types';
-import { initializeCanvasEngine } from './core/engine/CanvasEngine';
-import { Toolbar } from './components/tools/Toolbar';
-import { ToolOptionsPanel } from './components/tools/ToolOptionsPanel';
-import { LayersPanel } from './components/panels/LayersPanel';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { getStore, useStore, useDispatch } from './core/state/store';
+import type { RGBAColor } from './types';
+import { CanvasEngine } from './core/engine/CanvasEngine';
+import { InteractionController } from './core/interaction/InteractionController';
+import { createCommands, Commands, CommandUI } from './core/commands';
+import { installShortcuts } from './shortcuts/shortcuts';
+import { getToolRegistry } from './core/tools/ToolRegistry';
+import { newDocument } from './core/io/imageIO';
+import { exportDocument } from './core/io/exporter';
+import { AppProvider } from './ui/AppContext';
+import { MenuBar } from './ui/MenuBar';
+import { OptionsBar } from './ui/OptionsBar';
+import { Toolbox } from './ui/Toolbox';
+import { StatusBar } from './ui/StatusBar';
+import {
+  PaletteGroup,
+  LayersPanel,
+  HistoryPanel,
+  ColorPanel,
+  PropertiesPanel,
+  NavigatorPanel,
+} from './ui/Panels';
+import {
+  NewDocumentDialog,
+  ExportDialog,
+  CanvasSizeDialog,
+  ColorPickerDialog,
+  TextDialog,
+} from './ui/Dialogs';
 
-// Main App Component
+type Dialog =
+  | { type: 'new' }
+  | { type: 'export' }
+  | { type: 'canvasSize' }
+  | { type: 'color'; which: 'fg' | 'bg' }
+  | { type: 'text'; x: number; y: number }
+  | null;
+
 function App() {
   const dispatch = useDispatch();
   const state = useStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [canvasEngine, setCanvasEngine] = useState<any>(null);
-  const [initialized, setInitialized] = useState(false);
+  const docAreaRef = useRef<HTMLDivElement>(null);
+  const engineRef = useRef<CanvasEngine | null>(null);
+  const controllerRef = useRef<InteractionController | null>(null);
+  const commandsRef = useRef<Commands | null>(null);
 
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<{ x: number; y: number; hint: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<Dialog>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  // ---- one-time init ----
   useEffect(() => {
-    // Initialize with a default document
-    const doc: Document = {
-      id: 'doc-1',
-      name: 'Untitled',
-      artboards: [{
-        id: 'artboard-1',
-        name: 'Artboard 1',
-        x: 0,
-        y: 0,
-        width: 800,
-        height: 600,
-        backgroundColor: { r: 255, g: 255, b: 255, a: 1 },
-        locked: false,
-      }],
-      activeArtboardId: 'artboard-1',
-      layers: [],
-      history: [],
-      historyIndex: -1,
-      metadata: {
-        createdAt: new Date(),
-        modifiedAt: new Date(),
-        version: '1.0.0',
-        colorProfile: 'sRGB',
-        bitsPerChannel: 8,
-      },
+    if (!canvasRef.current || !docAreaRef.current) return;
+    const engine = new CanvasEngine(canvasRef.current);
+    engineRef.current = engine;
+
+    const controller = new InteractionController(canvasRef.current, engine);
+    controllerRef.current = controller;
+
+    const ui: CommandUI = {
+      openNewDialog: () => setDialog({ type: 'new' }),
+      openExportDialog: () => setDialog({ type: 'export' }),
+      openColorPicker: (which) => setDialog({ type: 'color', which }),
+      openCanvasSizeDialog: () => setDialog({ type: 'canvasSize' }),
+      toast: showToast,
     };
+    const commands = createCommands({ engine, controller, ui });
+    commandsRef.current = commands;
 
+    controller.onStatus = setStatus;
+    controller.onColorPick = (c: RGBAColor, alt: boolean) =>
+      getStore().dispatch({ type: alt ? 'SET_BACKGROUND' : 'SET_FOREGROUND', payload: c });
+    controller.onRequestText = (x, y) => setDialog({ type: 'text', x, y });
+
+    // desktop color from theme token
+    const refreshDesktop = () => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--ps-desktop').trim();
+      controller.setDesktop(v || '#5d5d5d');
+    };
+    refreshDesktop();
+
+    const removeShortcuts = installShortcuts(commands, controller);
+
+    // size + render on container resize
+    const ro = new ResizeObserver(() => {
+      const rect = docAreaRef.current!.getBoundingClientRect();
+      engine.resize(rect.width, rect.height);
+      controller.renderNow();
+    });
+    ro.observe(docAreaRef.current);
+
+    // register tools + default document
+    const registry = getToolRegistry();
+    dispatch({ type: 'REGISTER_TOOLS', payload: registry.getAllTools() });
+    dispatch({ type: 'SET_ACTIVE_TOOL', payload: 'brush' });
+
+    const doc = newDocument('Untitled-1', 800, 600, 'white');
+    doc.activeArtboardId = doc.artboards[0].id;
     dispatch({ type: 'SET_DOCUMENT', payload: doc });
-    setInitialized(true);
-  }, [dispatch]);
 
-  useEffect(() => {
-    if (canvasRef.current && initialized) {
-      const engine = initializeCanvasEngine(canvasRef.current);
-      setCanvasEngine(engine);
-      
-      // Register tools from registry
-      import('./core/tools/ToolRegistry').then(({ getToolRegistry }) => {
-        const registry = getToolRegistry();
-        const allTools = registry.getAllTools();
-        dispatch({ type: 'REGISTER_TOOLS', payload: allTools });
-        
-        // Set initial tool
-        dispatch({ type: 'SET_ACTIVE_TOOL', payload: 'move' });
-      });
+    setReady(true);
+    // fit after layout settles
+    window.setTimeout(() => {
+      const rect = docAreaRef.current!.getBoundingClientRect();
+      engine.resize(rect.width, rect.height);
+      commands.fitToScreen();
+      controller.renderNow();
+    }, 30);
+
+    // theme re-sync on change handled in MenuBar; also watch attribute
+    const obs = new MutationObserver(refreshDesktop);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    return () => {
+      removeShortcuts();
+      ro.disconnect();
+      obs.disconnect();
+      controller.dispose();
+      engine.dispose();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- drag & drop image ----
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/') && commandsRef.current) {
+      const name = file.name.replace(/\.[^.]+$/, '');
+      if (state.document) commandsRef.current.placeImageFile(file, name);
+      else commandsRef.current.openImageFile(file, name);
     }
-  }, [canvasRef, initialized, dispatch]);
+  };
 
-  useEffect(() => {
-    if (canvasEngine && state.document) {
-      canvasEngine.render(state.document);
-    }
-  }, [canvasEngine, state.document, state.viewport, state.selection, state.activeTool]);
-
-  if (!initialized) {
-    return (
-      <div style={{ 
-        background: '#1e1e1e', 
-        height: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        color: '#fff' 
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: 32, marginBottom: 16 }}>Stratum</h1>
-          <p style={{ color: '#888' }}>Loading creative suite...</p>
-        </div>
-      </div>
-    );
-  }
+  const commands = commandsRef.current;
 
   return (
-    <div style={{
-      display: 'flex',
-      height: '100vh',
-      background: '#1e1e1e',
-      overflow: 'hidden',
-    }}>
-      {/* Left Toolbar */}
-      <Toolbar orientation="vertical" compact={false} />
-      
-      {/* Center Canvas Area */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        {/* Top menu bar placeholder */}
-        <div style={{
-          height: 40,
-          background: '#2a2a2a',
-          borderBottom: '1px solid #444',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          gap: 24,
-        }}>
-          <span style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>Stratum</span>
-          {['File', 'Edit', 'Image', 'Layer', 'Type', 'Select', 'Filter', 'View', 'Window', 'Help'].map(menu => (
-            <button
-              key={menu}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ccc',
-                fontSize: 12,
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: 4,
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = '#3a3a3a'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-            >
-              {menu}
-            </button>
-          ))}
-        </div>
-        
-        {/* Canvas */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <canvas
-            ref={canvasRef}
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'block',
-            }}
-          />
-          
-          {/* Zoom indicator */}
-          <div style={{
-            position: 'absolute',
-            bottom: 16,
-            left: 16,
-            background: '#2a2a2a',
-            padding: '8px 12px',
-            borderRadius: 4,
-            color: '#fff',
-            fontSize: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          }}>
-            {Math.round((state.viewport.zoom || 1) * 100)}%
-          </div>
-          
-          {/* Active tool indicator */}
-          <div style={{
-            position: 'absolute',
-            bottom: 16,
-            right: 16,
-            background: '#2a2a2a',
-            padding: '8px 12px',
-            borderRadius: 4,
-            color: '#fff',
-            fontSize: 12,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            <span>{state.tools.find(t => t.id === state.activeTool)?.icon || '🔧'}</span>
-            <span>{state.tools.find(t => t.id === state.activeTool)?.name || state.activeTool}</span>
-          </div>
-        </div>
+    <div className="app-shell">
+      <div className="titlebar">
+        <span className="app-name">Adobe Photoshop</span>
+        <span className="doc-name">— {state.document?.name ?? 'Untitled'} {ready ? `@ ${Math.round(state.viewport.zoom * 100)}%` : ''}</span>
+        <span style={{ marginLeft: 'auto', opacity: 0.7, fontSize: 10 }}>Stratum · Unified Canvas</span>
       </div>
-      
-      {/* Right Panels */}
-      <ToolOptionsPanel />
-      <LayersPanel />
+
+      {commands && (
+        <AppProvider value={{ commands, controller: controllerRef.current!, engine: engineRef.current! }}>
+          <MenuBar />
+          <OptionsBar />
+          <div className="app-body">
+            <Toolbox />
+            <div className="app-center">
+              <div
+                className="doc-area"
+                ref={docAreaRef}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={onDrop}
+              >
+                <canvas ref={canvasRef} />
+                {toast && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 12,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(0,0,0,0.8)',
+                      color: '#fff',
+                      padding: '6px 12px',
+                      fontSize: 11,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {toast}
+                  </div>
+                )}
+              </div>
+              <StatusBar status={status} />
+            </div>
+            {state.panels.layersOpen || state.panels.historyOpen || state.panels.propertiesOpen ? (
+              <div className="dock">
+                <PaletteGroup
+                  tabs={[
+                    { id: 'nav', label: 'Navigator', render: () => <NavigatorPanel /> },
+                    { id: 'color', label: 'Color', render: () => <ColorPanel /> },
+                  ]}
+                />
+                {state.panels.propertiesOpen && (
+                  <PaletteGroup
+                    tabs={[
+                      { id: 'props', label: 'Properties', render: () => <PropertiesPanel /> },
+                      { id: 'develop', label: 'Develop', render: () => <PropertiesPanel /> },
+                    ]}
+                  />
+                )}
+                {state.panels.historyOpen && (
+                  <PaletteGroup tabs={[{ id: 'history', label: 'History', render: () => <HistoryPanel /> }]} />
+                )}
+                {state.panels.layersOpen && (
+                  <PaletteGroup
+                    tabs={[
+                      { id: 'layers', label: 'Layers', render: () => <LayersPanel /> },
+                      { id: 'channels', label: 'Channels', render: () => <div className="dim" style={{ padding: 6 }}>Channels view not yet available.</div> },
+                      { id: 'paths', label: 'Paths', render: () => <div className="dim" style={{ padding: 6 }}>Paths view not yet available.</div> },
+                    ]}
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
+        </AppProvider>
+      )}
+
+      {/* Dialogs */}
+      {dialog?.type === 'new' && commands && (
+        <NewDocumentDialog
+          onCancel={() => setDialog(null)}
+          onCreate={(w, h, bg) => {
+            commands.newDocument(w, h, bg);
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === 'export' && commands && (
+        <ExportDialog
+          onCancel={() => setDialog(null)}
+          onExport={(fmt, q) => {
+            const d = getStore().getState().document;
+            if (d) exportDocument(engineRef.current!, d, fmt, q);
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === 'canvasSize' && commands && state.document && (
+        <CanvasSizeDialog
+          initW={CanvasEngine.activeArtboard(state.document).width}
+          initH={CanvasEngine.activeArtboard(state.document).height}
+          onCancel={() => setDialog(null)}
+          onApply={(w, h) => {
+            commands.resizeCanvas(w, h);
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === 'color' && (
+        <ColorPickerDialog
+          initial={dialog.which === 'fg' ? state.foreground : state.background}
+          onCancel={() => setDialog(null)}
+          onApply={(c) => {
+            dispatch({ type: dialog.which === 'fg' ? 'SET_FOREGROUND' : 'SET_BACKGROUND', payload: c });
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === 'text' && commands && (
+        <TextDialog
+          initColor={state.foreground}
+          onCancel={() => setDialog(null)}
+          onCreate={(text, size, family, color) => {
+            commands.createTextLayer(dialog.x, dialog.y, text, size, family, color);
+            setDialog(null);
+          }}
+        />
+      )}
     </div>
   );
 }
