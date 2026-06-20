@@ -7,7 +7,7 @@
 // LAYER TYPES
 // ============================================================================
 
-export type LayerType = 'raster' | 'vector' | 'adjustment' | 'mask' | 'group';
+export type LayerType = 'raster' | 'vector' | 'adjustment' | 'mask' | 'group' | 'text' | 'fill';
 
 export interface BaseLayer {
   id: string;
@@ -20,6 +20,8 @@ export interface BaseLayer {
   order: number;
   parentId?: string;
   expanded?: boolean; // For groups
+  /** Per-layer raster mask (alpha multiplier) applied during compositing. */
+  layerMask?: MaskData;
 }
 
 export interface RasterLayer extends BaseLayer {
@@ -57,7 +59,37 @@ export interface GroupLayer extends BaseLayer {
   children: Layer[];
 }
 
-export type Layer = RasterLayer | VectorLayer | AdjustmentLayer | MaskLayer | GroupLayer;
+export interface TextLayer extends BaseLayer {
+  type: 'text';
+  text: string;
+  x: number;
+  y: number;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number | 'normal' | 'bold';
+  fontStyle: 'normal' | 'italic';
+  color: RGBAColor;
+  align: 'left' | 'center' | 'right';
+  leading: number; // line height in px
+  tracking: number; // letter spacing in px
+  boxWidth?: number; // paragraph text wrap width
+}
+
+export interface FillLayer extends BaseLayer {
+  type: 'fill';
+  fill: FillStyle;
+  /** Optional clip path; when absent fills the whole artboard. */
+  mask?: MaskData;
+}
+
+export type Layer =
+  | RasterLayer
+  | VectorLayer
+  | AdjustmentLayer
+  | MaskLayer
+  | GroupLayer
+  | TextLayer
+  | FillLayer;
 
 // ============================================================================
 // VECTOR TYPES
@@ -399,11 +431,14 @@ export interface ToolOption {
   id: string;
   type: 'checkbox' | 'slider' | 'dropdown' | 'color' | 'text' | 'button-group';
   label: string;
-  default: unknown;
+  default?: unknown;
   min?: number;
   max?: number;
   step?: number;
-  options?: Array<{ value: string; label: string }>;
+  /** Dropdown choices. Authoring may use bare strings; normalize at render. */
+  options?: Array<string | { value: string; label: string }>;
+  /** Segmented button choices for `button-group`. */
+  buttons?: Array<{ value: string; label: string; icon?: string; tooltip?: string }>;
 }
 
 // ============================================================================
@@ -416,6 +451,13 @@ export interface SelectionData {
   path?: VectorPath;
   feather?: number;
   antiAlias: boolean;
+  /**
+   * Rasterized selection mask in artboard pixel space (0=outside, 255=inside).
+   * When present it is authoritative for clipping edits. width/height describe it.
+   */
+  mask?: Uint8Array;
+  maskWidth?: number;
+  maskHeight?: number;
 }
 
 export interface TransformData {
@@ -436,8 +478,10 @@ export interface TransformData {
 
 export interface CanvasEvent {
   type: 'mousedown' | 'mousemove' | 'mouseup' | 'dblclick' | 'wheel' | 'keydown' | 'keyup';
+  /** Raw screen coordinates (clientX/clientY). */
   x: number;
   y: number;
+  /** Artboard-pixel coordinates (DPR/zoom/pan/origin already removed). */
   canvasX: number;
   canvasY: number;
   button?: number;
@@ -445,8 +489,12 @@ export interface CanvasEvent {
   shiftKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
+  metaKey: boolean;
   delta?: number;
   key?: string;
+  /** Pen pressure 0..1 (1 for mouse). */
+  pressure?: number;
+  pointerType?: string;
 }
 
 // ============================================================================

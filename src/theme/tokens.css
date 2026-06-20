@@ -1,0 +1,74 @@
+/* ==========================================================================
+   Stratum theme tokens — CS2 (default) and Modern (dark).
+   Components reference var(--ps-*) only; switch with <html data-theme="...">.
+   ========================================================================== */
+
+:root[data-theme='cs2'] {
+  --ps-desktop: #5d5d5d; /* gray workspace behind documents */
+  --ps-chrome: #d4d0c8; /* classic 3D-objects gray (panel/toolbar/menu face) */
+  --ps-chrome-2: #ece9e1; /* lighter panel body */
+  --ps-chrome-3: #e8e6df;
+  --ps-bevel-light: #ffffff; /* top/left bevel */
+  --ps-bevel-shadow: #808080; /* bottom/right bevel */
+  --ps-bevel-dark: #404040; /* deep groove */
+  --ps-titlebar-from: #b0b0b0; /* palette title gradient top */
+  --ps-titlebar-to: #d4d0c8; /* palette title gradient bottom */
+  --ps-titlebar-text: #000000;
+  --ps-tab-active: #ece9e1; /* active palette tab */
+  --ps-tab-inactive: #c2beb6;
+  --ps-accent: #316ac5; /* XP selection blue */
+  --ps-accent-2: #4a86e8;
+  --ps-accent-text: #ffffff;
+  --ps-text: #000000;
+  --ps-text-dim: #404040;
+  --ps-disabled: #9a9a9a;
+  --ps-line: #919191; /* separators */
+  --ps-tool-active-bg: #b8cce4; /* pressed-in tool tint */
+  --ps-input-bg: #ffffff;
+  --ps-input-border: #7f7f7f;
+  --ps-menu-bg: #d4d0c8;
+  --ps-menu-hover: #316ac5;
+  --ps-menu-hover-text: #ffffff;
+  --ps-canvas-shadow: rgba(0, 0, 0, 0.45);
+  --ps-font: Tahoma, 'Segoe UI', 'Lucida Grande', Verdana, sans-serif;
+  --ps-font-size: 11px;
+  --ps-row-h: 22px;
+  --ps-tool-size: 26px;
+  --ps-radius: 0px;
+  color-scheme: light;
+}
+
+:root[data-theme='modern'] {
+  --ps-desktop: #1e1e1e;
+  --ps-chrome: #2a2a2a;
+  --ps-chrome-2: #2f2f2f;
+  --ps-chrome-3: #333333;
+  --ps-bevel-light: #3a3a3a;
+  --ps-bevel-shadow: #161616;
+  --ps-bevel-dark: #0d0d0d;
+  --ps-titlebar-from: #353535;
+  --ps-titlebar-to: #2a2a2a;
+  --ps-titlebar-text: #e6e6e6;
+  --ps-tab-active: #383838;
+  --ps-tab-inactive: #262626;
+  --ps-accent: #2d8cff;
+  --ps-accent-2: #4a9bff;
+  --ps-accent-text: #ffffff;
+  --ps-text: #e6e6e6;
+  --ps-text-dim: #9a9a9a;
+  --ps-disabled: #5a5a5a;
+  --ps-line: #1a1a1a;
+  --ps-tool-active-bg: #114a87;
+  --ps-input-bg: #1c1c1c;
+  --ps-input-border: #4a4a4a;
+  --ps-menu-bg: #2a2a2a;
+  --ps-menu-hover: #2d8cff;
+  --ps-menu-hover-text: #ffffff;
+  --ps-canvas-shadow: rgba(0, 0, 0, 0.6);
+  --ps-font: 'Segoe UI', -apple-system, system-ui, sans-serif;
+  --ps-font-size: 12px;
+  --ps-row-h: 24px;
+  --ps-tool-size: 28px;
+  --ps-radius: 3px;
+  color-scheme: dark;
+}

@@ -302,7 +302,7 @@ export class Adjustments {
 
     for (const range of ranges) {
       if (hue >= range.start && hue < range.end) {
-        return range.shift;
+        return range.shift ?? 0; // empty HSL bands must be a no-op, not NaN
       }
     }
 
