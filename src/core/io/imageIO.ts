@@ -117,10 +117,10 @@ export function newDocument(
   let bgColor: RGBAColor | undefined;
   if (background === 'white') {
     bgColor = { r: 255, g: 255, b: 255, a: 1 };
-    layers.push(newRasterLayer('Background', width, height, 0, filledImageData(width, height, bgColor), true));
+    layers.push(newRasterLayer('Background', width, height, 0, filledImageData(width, height, bgColor), false));
   } else if (background !== 'transparent') {
     bgColor = background;
-    layers.push(newRasterLayer('Background', width, height, 0, filledImageData(width, height, bgColor), true));
+    layers.push(newRasterLayer('Background', width, height, 0, filledImageData(width, height, bgColor), false));
   }
   return {
     id: uid('doc'),

@@ -1,185 +1,111 @@
-# Unified Canvas
+# Stratum — Unified Canvas
 
-A unified **Photoshop + Illustrator + Lightroom** alternative built with React, TypeScript, and Canvas API.
+A browser image / vector / photo editor (React 18 + TypeScript + Vite) fusing Photoshop
+(raster), Illustrator (vector), and Lightroom (develop) concepts, presented in a faithful
+**Adobe Photoshop CS2 (2006) "Adobe gray"** interface.
 
-## Features
+This codebase was resurrected from a non-functional shell: the engine, tools, and state
+machinery existed but were disconnected. It now has a real interaction + render spine, real
+tools, and a swappable CS2/Modern theme.
 
-### Photoshop-like Raster Tools
-- **Brush Engine** - Pressure-sensitive brushes with customizable tips, spacing, jitter, smoothing
-- **Eraser** - Full brush engine with clear blend mode
-- **Selection Tools** - Marquee (rect/ellipse), Lasso (freeform/polygonal), Magic Wand (tolerance-based)
-- **Fill & Gradient** - Flood fill with tolerance, linear/radial/angle/reflected/diamond gradients
-- **Filters** - Gaussian blur, motion blur, unsharp mask, noise (uniform/gaussian, monochromatic)
-- **Adjustment Layers** - Brightness/Contrast, Curves, Levels, HSL, Exposure (non-destructive)
+## Run
 
-### Illustrator-like Vector Tools
-- **Pen Tool** - Bezier curves with handle control, corner/smooth conversion
-- **Curvature Pen** - Auto-smooth curve creation
-- **Shape Tools** - Rectangle, Ellipse, Polygon, Star, Line
-- **Path Editing** - Add/Delete/Convert anchor points, direct selection
-- **Text Tool** - Rich text editing, font management, convert to outlines
-
-### Lightroom-like Photo Tools
-- **Non-destructive Adjustments** - All adjustments as live layers
-- **Histogram** - Real-time RGB/Luminosity histogram
-- **Color Grading** - Shadows/Midtones/Highlights color wheels
-- **Local Adjustments** - Brush-based dodge/burn, graduated/radial filters
-
-### Unified Workflow
-- **Layer System** - Raster, Vector, Text, Fill, Adjustment, Group layers
-- **Blend Modes** - 27 blend modes (Normal, Multiply, Screen, Overlay, etc.)
-- **Masks** - Layer masks, vector masks, clipping masks
-- **Transform** - Free transform with handles, perspective, warp, puppet warp
-- **History** - Unlimited undo/redo with branching
-- **Import/Export** - PNG, JPEG, WebP, SVG, project files (.ucp)
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- npm or pnpm
-
-### Installation
 ```bash
-cd unified-canvas
 npm install
+npm run dev      # http://localhost:3000
+npm run build    # tsc + vite build
+npm test         # vitest unit tests (color, coords, blend, flood, selection)
 ```
 
-### Development
-```bash
-npm run dev
-```
-Open http://localhost:3000
+## Interface
 
-### Build
-```bash
-npm run build
-npm run preview
-```
+Default theme is **CS2 (2006)** — single-column toolbox with flyout groups, options bar with
+the tool-preset well, docked tabbed palettes (Navigator/Color, Properties/Develop, History,
+Layers/Channels/Paths), gray document window, and a status bar. Switch to a **Modern** dark
+theme via *Window ▸ Theme*. All tool/panel icons are monochrome inline-SVG recreations of the
+CS2 glyphs — there are no emoji anywhere in the UI.
 
-## Keyboard Shortcuts
+## What's real (deterministic, wired)
 
-| Shortcut | Action |
-|----------|--------|
-| `V` | Move/Select tool |
-| `B` | Brush tool |
-| `E` | Eraser tool |
-| `P` | Pen tool |
-| `T` | Text tool |
-| `U` | Shape tool |
-| `M` | Marquee selection |
-| `L` | Lasso selection |
-| `W` | Magic wand |
-| `C` | Crop tool |
-| `I` | Eyedropper |
-| `G` | Gradient tool |
-| `Ctrl+T` | Free Transform |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Shift+Z` / `Ctrl+Y` | Redo |
-| `Ctrl+S` | Save project |
-| `Ctrl+Shift+S` | Save as |
-| `Ctrl+E` | Export |
-| `Ctrl+J` | New layer |
-| `Ctrl+Shift+J` | Duplicate layer |
-| `Ctrl+G` | Group layers |
-| `Ctrl+Shift+E` | Merge layers |
-| `Ctrl++` / `Ctrl+-` | Zoom in/out |
-| `Ctrl+0` | Actual size |
-| `Space` (hold) | Hand tool |
-| `X` | Swap colors |
-| `D` | Default colors |
+| Area | Status |
+|---|---|
+| Open / Place / drag-drop image, New document, project save/load (.stratum), Export PNG/JPEG/WebP | ✅ |
+| Viewport: zoom-to-cursor, pan (space/hand), fit / actual pixels, DPR-correct, ResizeObserver | ✅ |
+| Compositing: 16 blend modes, per-layer opacity, raster + vector (Path2D) + text + fill + adjustment layers | ✅ |
+| Move (raster/vector/text), arrow-nudge | ✅ |
+| Marquee (rect/ellipse, shift-constrain, alt-from-center), Lasso, Polygonal Lasso | ✅ |
+| Magic Wand (tolerance, contiguous) with real mask + marching ants | ✅ |
+| Selections clip paint / fill / gradient; Select All / Deselect / Reselect / Inverse | ✅ |
+| Crop (drag + thirds, Enter applies, resizes artboard + layers) | ✅ |
+| Brush / Pencil (foreground color, size/hardness/opacity/flow), Eraser, Eyedropper | ✅ |
+| Paint Bucket (tolerance flood), Gradient (5 shapes Linear/Radial/Angular/Reflected/Diamond, fg→bg, reverse) | ✅ |
+| Clone Stamp (alt-set source), Healing / Spot Healing, Dodge / Burn / Sponge, Blur / Sharpen / Smudge | ✅ |
+| Shapes (rect/rounded/ellipse/triangle/polygon/line/custom → editable vector layers) | ✅ |
+| Pen (click path, double-click to close → vector layer) | ✅ |
+| Type (point text layer, font/size/color) | ✅ |
+| Adjustment layers (non-destructive, over composite-beneath): Exposure, Contrast, Highlights, Shadows, Whites, Blacks, Vibrance, Saturation, Temperature, Tint, Clarity, Dehaze, Texture, Curves, Levels, HSL, Color Balance, Split Toning, Vignette, Invert, Posterize, Threshold, Gradient Map | ✅ algorithms wired; live sliders for the basic set |
+| Destructive filters: Gaussian Blur, Sharpen, Reduce Noise, Invert, Desaturate | ✅ |
+| Layers panel (add/delete/duplicate/visibility/lock/opacity/blend), Merge Down, Flatten | ✅ |
+| History panel + gesture-granular undo/redo (one step per gesture) | ✅ |
+| Color picker (HSV square + hue + RGB/Hex), Color/Swatches panel | ✅ |
+| Foreground/background swatches, X swap, D defaults, Quick Mask toggle | ✅ |
+| Menu bar (File/Edit/Image/Layer/Select/Filter/View/Window/Help) with enable/disable | ✅ |
+| Global keyboard shortcuts incl. tool cycling for shared letters | ✅ |
 
-## Project Structure
+## What's partial / honest stubs
 
-```
-src/
-├── types/           # TypeScript type definitions
-├── constants/       # Tool IDs, blend modes, etc.
-├── engine/          # Core rendering & computation
-│   ├── Renderer.ts         # Multi-layer canvas renderer
-│   ├── VectorRenderer.ts   # Vector path rendering
-│   ├── RasterOps.ts        # Brush, fill, blur, filters
-│   ├── Adjustments.ts      # Non-destructive adjustments
-│   ├── HitTester.ts        # Layer/object hit testing
-│   └── SelectionRenderer.ts # Selection visualization
-├── tools/           # Tool implementations (React hooks)
-│   ├── SelectionTool.tsx
-│   ├── BrushTool.tsx
-│   ├── PenTool.tsx
-│   ├── TextTool.tsx
-│   └── TransformTool.tsx
-├── ui/              # UI components
-│   ├── Toolbar.tsx
-│   ├── LayerPanel.tsx
-│   ├── PropertiesPanel.tsx
-│   ├── CanvasViewport.tsx
-│   └── ColorPicker.tsx
-├── files/           # File I/O
-│   └── FileIO.ts
-├── utils/           # Utilities
-│   └── history.ts
-├── styles/          # CSS
-├── App.tsx          # Main app component
-└── index.tsx        # Entry point
-```
+- **Quick Mask** toggles state but does not yet enter a paintable red-overlay editing mode.
+- **Free Transform (Ctrl+T)**: handles are drawn for crop; full layer free-transform is not yet a
+  committed gesture (use Move for translation).
+- **Pen editing** (add/delete/convert anchor, Direct Selection) and **Pathfinder** booleans are not wired;
+  the Pen creates paths but doesn't yet edit existing anchors.
+- **Magnetic Lasso / Quick Selection / Object Selection** fall back to plain lasso/wand behavior.
+- **Curves / HSL / Color Balance / Split Toning** adjustment layers apply via the existing algorithms,
+  but only single-slider adjustments expose live UI controls in the Properties panel.
+- **Channels / Paths** palette tabs are placeholders.
+
+## Not available (honest — never faked)
+
+Per the design rule, AI/generative and out-of-scope features are **disabled and labeled**, never
+faked: Generative Fill / Expand / Remove, Neural Filters, AI subject/sky/people masking, Denoise-AI,
+Text-to-Vector, RAW demosaicing, PSD/AI/DNG import-export, GPU/WebGL compute, and color management
+beyond sRGB. These appear in menus marked *(unavailable)*.
 
 ## Architecture
 
-### Rendering Pipeline
-1. **Document** → Sorted layers by z-index
-2. **Layer** → Type-specific renderer (Raster/Vector/Text/Fill)
-3. **Adjustment Layers** → Applied as post-processing passes
-4. **Masks** → Composited during layer render
-5. **Viewport** → Transform (zoom/pan) applied at end
+```
+src/
+  types/index.ts                 single source of truth for the data model
+  core/
+    state/store.ts               pub/sub store; gesture-granular history (begin/commit)
+    color/color.ts               sRGB conversions (rgb/hsv/hsl/hex)
+    engine/
+      CanvasEngine.ts            pure DPR-correct renderer; one composite pass; blend + overlays
+      RasterOps.ts               blend math + pixel adjustments (preserved)
+      Adjustments.ts             25 adjustment algorithms (preserved)
+      VectorRenderer.ts          SVG export helper (display goes through Path2D in CanvasEngine)
+    interaction/
+      coords.ts                  screen <-> artboard transform
+      selection.ts               mask rasterization + marching-ants edges
+      InteractionController.ts   the interaction spine (pointer/key/gesture/history)
+      paintOps.ts                brush/fill/gradient/shape pixel ops
+    io/                          image decode, document/layer factories, export, project save/load
+    tools/                       ToolRegistry (135 tools) + ToolEngine algorithms
+    commands.ts                  command layer shared by menus/shortcuts/buttons
+  shortcuts/shortcuts.ts         global keyboard manager
+  theme/                         tokens.css (cs2 + modern) + chrome.css bevels
+  ui/                            CS2 React components (toolbox, options bar, menus, panels, dialogs)
+```
 
-### State Management
-- React hooks for local tool state
-- Immutable document updates with history tracking
-- Centralized document state in App component
+Single source of truth for **types** (`types/index.ts`) and for **viewport / colors / selection /
+tool options** (the store). One render path through `CanvasEngine.render`. See `CHANGELOG.md` for the
+B-list (bug/gap) status.
 
-### Performance
-- OffscreenCanvas for Workers (future)
-- Dirty region rendering (future)
-- WebGL compute shaders for filters (future)
+## Keyboard shortcuts
 
-## Roadmap
-
-### v0.2 - Core Polish
-- [ ] WebGL renderer option
-- [ ] Layer effects (drop shadow, stroke, glow)
-- [ ] Smart objects
-- [ ] Better text engine (OpenType features)
-
-### v0.3 - Advanced Features
-- [ ] 3D extrude/revolve
-- [ ] Perspective grid
-- [ ] Symbol/Component system
-- [ ] Artboards
-
-### v0.4 - Lightroom Module
-- [ ] RAW processing pipeline
-- [ ] Lens corrections
-- [ ] Noise reduction (AI)
-- [ ] Batch export
-
-### v1.0 - Production Ready
-- [ ] Plugin API
-- [ ] Scripting (JS/TS)
-- [ ] Cloud sync
-- [ ] Mobile companion
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes with tests
-4. Submit PR
-
-## Acknowledgments
-
-Inspired by Adobe Photoshop, Illustrator, and Lightroom.
-Built with React, Vite, and the Canvas API.
+Tools: `V` move, `M` marquee, `L` lasso, `W` wand, `C` crop, `J` heal, `B` brush, `S` clone,
+`Y` history brush, `E` eraser, `G` gradient/bucket, `O` dodge/burn/sponge, `P` pen, `T` type,
+`A` path select, `U` shapes, `H` hand, `Z` zoom, `I` eyedropper, `K` slice (press again to cycle a group).
+Commands: `Ctrl+N/O/S`, `Ctrl+Shift+E` export, `Ctrl+Z`/`Ctrl+Shift+Z` undo/redo, `Ctrl+A/D`,
+`Ctrl+Shift+D/I` reselect/inverse, `Ctrl+J` duplicate, `Ctrl+E` merge down, `Shift+F5` fill,
+`Ctrl +/-/0/1` zoom, `[` `]` brush size, `D`/`X` default/swap colors, `Q` quick mask, `Space` pan.

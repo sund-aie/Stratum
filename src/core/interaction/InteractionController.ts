@@ -68,9 +68,23 @@ export class InteractionController {
     this.canvas = canvas;
     this.engine = engine;
     this.store = getStore();
+    this.lastTool = this.store.getState().activeTool;
     this.attach();
-    this.store.subscribe(() => this.requestRender());
+    this.store.subscribe(() => this.onStoreChange());
     this.startAnts();
+  }
+
+  private lastTool = '';
+  private onStoreChange(): void {
+    const tool = this.store.getState().activeTool;
+    if (tool !== this.lastTool) {
+      this.lastTool = tool;
+      // clear transient state from the previous tool
+      if (this.penPoints.length) this.commitPen(false);
+      this.overlay = null;
+      this.gesture = null;
+    }
+    this.requestRender();
   }
 
   // -------------------------------------------------------------------------
@@ -278,6 +292,8 @@ export class InteractionController {
       this.dispatchMove(this.gesture.toolId, x, y, e);
       this.gesture.lastX = x;
       this.gesture.lastY = y;
+    } else if (this.store.getState().activeTool === 'pen' && this.penPoints.length) {
+      this.setPenHover(x, y);
     } else {
       this.requestRender(); // update brush cursor
     }
