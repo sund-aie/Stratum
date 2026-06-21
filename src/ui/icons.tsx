@@ -389,6 +389,50 @@ export const glyphs: Record<string, G> = {
       <path d="M8.5 4l3 4-3 4" strokeWidth="1.4" />
     </>
   ),
+
+  // ---- Vector tools ----
+  star: solid(<path d="M8 1.6l1.8 4.1 4.5.4-3.4 3 1 4.4L8 11.1 4.1 13.5l1-4.4-3.4-3 4.5-.4z" />),
+  triangle: solid(<path d="M8 2.5l5.5 11h-11z" />),
+  groupSelect: solid(
+    <>
+      <path d="M3 1.5l6 3.6-2.4.5 1.5 2.6-1.1.6L5.5 6.2 4 8z" />
+      <path d="M9 7.5l6 3.6-2.4.5 1.5 2.6-1.1.6-1.5-2.6L9.9 14z" />
+    </>
+  ),
+  curvature: stroke(<path d="M2 13c1-7 5-10 12-11" />),
+  smooth: stroke(<><path d="M2 12c3-1 5-6 7-6s2 5 5 4" /><circle cx="9" cy="6" r="0.8" fill="currentColor" /></>),
+  join: stroke(<><path d="M3 11a4 4 0 014-4" /><path d="M13 5a4 4 0 01-4 4" /><circle cx="7" cy="7" r="0.9" fill="currentColor" /><circle cx="9" cy="9" r="0.9" fill="currentColor" /></>),
+  shaper: stroke(<><rect x="3" y="4" width="8" height="8" rx="1" /><path d="M9 2l4 4-2 1" fill="currentColor" /></>),
+  lineSegment: stroke(<><path d="M3 13L13 3" strokeWidth="1.6" /><rect x="1.8" y="11.8" width="2.4" height="2.4" fill="currentColor" /><rect x="11.8" y="1.8" width="2.4" height="2.4" fill="currentColor" /></>),
+  arc: stroke(<><path d="M3 13A10 10 0 0113 3" /><rect x="1.8" y="11.8" width="2.4" height="2.4" fill="currentColor" /><rect x="11.8" y="1.8" width="2.4" height="2.4" fill="currentColor" /></>),
+  spiral: stroke(<path d="M8 8a1.5 1.5 0 11-1.5 1.5A3 3 0 1111 9 4.5 4.5 0 113 9" />),
+  gridTool: stroke(<><rect x="2.5" y="2.5" width="11" height="11" /><path d="M6 2.5v11M10 2.5v11M2.5 6h11M2.5 10h11" /></>),
+  polarGrid: stroke(<><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="3" /><path d="M8 2v12M2 8h12" /></>),
+  flare: stroke(<><circle cx="8" cy="8" r="2" fill="currentColor" /><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.5 3.5l2 2M10.5 10.5l2 2M12.5 3.5l-2 2M3.5 12.5l2-2" /></>),
+  paintbrushV: solid(<path d="M12.5 2.6c.7.5.7 1.4 0 2.2L8 9.5 6.5 8l4.3-5c.6-.7 1.2-.8 1.7-.4zM5.6 8.8L7.2 10.4c-.4 1.4-1.5 2.6-3.2 3.1-.7.2-1.5 0-2 .3.4-1 .5-2.2 1.1-3.2.5-.9 1.5-1.5 2.5-1.8z" />),
+  blobBrush: solid(<><path d="M11.5 2.6c.7.5.7 1.4 0 2.2L7.5 9.2 6 7.7l4-4.7c.6-.7 1-.8 1.5-.4z" /><circle cx="5" cy="11" r="2.6" /></>),
+  scissors: stroke(<><circle cx="4" cy="4" r="1.8" /><circle cx="4" cy="12" r="1.8" /><path d="M5.5 5L13 11M5.5 11L13 5" /></>),
+  knife: stroke(<><path d="M3 13l7-9 3 1-8 9z" fill="currentColor" /><path d="M3 13l1.5-1" /></>),
+  shapeBuilder: stroke(<><circle cx="6" cy="8" r="3.4" /><circle cx="10" cy="8" r="3.4" /><circle cx="8" cy="8" r="0.9" fill="currentColor" /></>),
+  livePaint: stroke(<><path d="M3 6.5l5-3.5 4.5 6.5-4.7 2.8z" fill="currentColor" /><path d="M2 9l1.5-2.5" /><circle cx="11" cy="12" r="1" fill="currentColor" /></>),
+  rotate: stroke(<><path d="M12.5 6A5 5 0 103 9" /><path d="M12.5 2.5V6H9" /></>),
+  reflect: stroke(<><path d="M8 2v12" strokeDasharray="2 1.5" /><path d="M6 5L3 8l3 3z" fill="currentColor" /><path d="M10 5l3 3-3 3z" fill="currentColor" /></>),
+  scaleTool: stroke(<><rect x="3" y="3" width="8" height="8" /><path d="M11 11l3 3M11 14h3v-3" fill="currentColor" /></>),
+  shear: stroke(<path d="M5 4h7l-3 8H2z" fill="currentColor" />),
+  freeTransform: stroke(<><rect x="3" y="3" width="10" height="10" /><rect x="2" y="2" width="2.4" height="2.4" fill="currentColor" /><rect x="11.6" y="2" width="2.4" height="2.4" fill="currentColor" /><rect x="2" y="11.6" width="2.4" height="2.4" fill="currentColor" /><rect x="11.6" y="11.6" width="2.4" height="2.4" fill="currentColor" /></>),
+  widthTool: stroke(<><path d="M3 8h10" /><path d="M5 5l-2 3 2 3M11 5l2 3-2 3" /></>),
+  symbol: stroke(<><rect x="2.5" y="2.5" width="5" height="5" /><circle cx="11" cy="5" r="2.6" /><path d="M5 9.5l2.6 4h-5.2z" fill="currentColor" /><rect x="9" y="9" width="5" height="5" /></>),
+
+  // ---- Photo / develop tools ----
+  aiSelect: stroke(<><path d="M5 4h6v8H5z" strokeDasharray="1.6 1.2" /><path d="M11 2.4l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5L9 4.9l1.5-.5z" fill="currentColor" /></>),
+  adjustBrush: solid(<><path d="M12.5 2.6c.7.5.7 1.4 0 2.2L8 9.5 6.5 8l4.3-5c.6-.7 1.2-.8 1.7-.4zM5.6 8.8L7.2 10.4c-.4 1.4-1.5 2.6-3.2 3.1-.7.2-1.5 0-2 .3.4-1 .5-2.2 1.1-3.2.5-.9 1.5-1.5 2.5-1.8z" /></>),
+  graduated: stroke(<><rect x="2.5" y="2.5" width="11" height="11" /><path d="M2.5 6h11M2.5 8.5h11M2.5 11h11" opacity="0.7" /></>),
+  radialFilter: stroke(<><ellipse cx="8" cy="8" rx="6" ry="4.2" strokeDasharray="2 1.4" /><circle cx="8" cy="8" r="1" fill="currentColor" /></>),
+  rangeMask: stroke(<><path d="M2 11l3-4 2 2 3-5 4 7z" fill="currentColor" /></>),
+  whiteBalance: stroke(<><path d="M11.5 2.2l2.3 2.3a1 1 0 010 1.4l-6.6 6.6-3.7-3.7L9.7 2.2a1 1 0 011.4 0z" /><path d="M8 7l-3 3" /></>),
+  targeted: stroke(<><circle cx="8" cy="8" r="5" /><path d="M8 3v3M8 10v3M3 8h3M10 8h3" /></>),
+  measure: stroke(<><path d="M2 6l8-3 4 8-8 3z" /><path d="M5 5l1 1.5M7 4l1.5 2M9 6l1 1.5M6 8l1.5 2" /></>),
+  count: solid(<><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.1" /><path d="M7 5.5h1.6V11h-1V6.7l-1 .3z" /></>),
 };
 
 // Pen reused for the vector layer-type icon.
@@ -446,7 +490,7 @@ export const TOOL_ICON: Record<string, string> = {
   colorSampler: 'colorSampler',
   ruler: 'ruler',
   note: 'note',
-  count: 'colorSampler',
+  count: 'count',
   spotHealing: 'healingSpot',
   healingBrush: 'healing',
   patch: 'patch',
@@ -481,7 +525,7 @@ export const TOOL_ICON: Record<string, string> = {
   verticalTypeMask: 'typeMask',
   selection: 'pathSelect',
   directSelection: 'directSelect',
-  groupSelection: 'pathSelect',
+  groupSelection: 'groupSelect',
   rectangle: 'shapeRect',
   roundedRectangle: 'shapeRounded',
   ellipse: 'shapeEllipse',
@@ -494,6 +538,66 @@ export const TOOL_ICON: Record<string, string> = {
   hand: 'hand',
   rotateView: 'rotateView',
   zoom: 'zoom',
+
+  // ---- Pixel additions ----
+  removeTool: 'healing',
+  measure: 'measure',
+  aiSelectSubject: 'aiSelect',
+  aiSelectSky: 'aiSelect',
+  aiSelectBackground: 'aiSelect',
+  aiSelectPeople: 'aiSelect',
+
+  // ---- Vector ----
+  curvature: 'curvature',
+  smooth: 'smooth',
+  join: 'join',
+  shaper: 'shaper',
+  star: 'star',
+  lineSegment: 'lineSegment',
+  arc: 'arc',
+  spiral: 'spiral',
+  grid: 'gridTool',
+  polarGrid: 'polarGrid',
+  flare: 'flare',
+  paintbrush: 'paintbrushV',
+  blobBrush: 'blobBrush',
+  scissors: 'scissors',
+  knife: 'knife',
+  shapeBuilder: 'shapeBuilder',
+  livePaintBucket: 'livePaint',
+  livePaintSelection: 'livePaint',
+  rotate: 'rotate',
+  reflect: 'reflect',
+  scale: 'scaleTool',
+  shear: 'shear',
+  freeTransform: 'freeTransform',
+  width: 'widthTool',
+  rescale: 'scaleTool',
+  type: 'type',
+  areaType: 'type',
+  typeOnPath: 'type',
+  verticalAreaType: 'typeVertical',
+  verticalTypeOnPath: 'typeVertical',
+  touchType: 'type',
+  symbolSprayer: 'symbol',
+  symbolShifter: 'symbol',
+  symbolScruncher: 'symbol',
+  symbolSizer: 'symbol',
+  symbolSpinner: 'symbol',
+  symbolStainer: 'symbol',
+  symbolScreener: 'symbol',
+  symbolStyler: 'symbol',
+
+  // ---- Photo / develop ----
+  cropOverlay: 'crop',
+  spotRemoval: 'healingSpot',
+  redEyeCorrection: 'healingSpot',
+  adjustmentBrush: 'adjustBrush',
+  graduatedFilter: 'graduated',
+  radialFilter: 'radialFilter',
+  rangeMask: 'rangeMask',
+  whiteBalance: 'whiteBalance',
+  targetedAdjustment: 'targeted',
 };
 
 export const ToolIcon: React.FC<{ toolId: string; size?: number; title?: string }> = ({

@@ -169,8 +169,16 @@ export class InteractionController {
       activeLayerId: s.activeLayerId,
       chrome: this.chrome,
       textColor: this.textColor,
+      revision: s.revision,
     });
   }
+
+  /** Invalidate the composite cache then render — for in-place pixel/path edits during a gesture
+   *  (the store revision only bumps on commit, so the cache must be busted explicitly). */
+  requestRenderDirty = (): void => {
+    this.engine.invalidateComposite();
+    this.requestRender();
+  };
 
   private startAnts(): void {
     this.antsTimer = window.setInterval(() => {
@@ -584,7 +592,7 @@ export class InteractionController {
       (layer as any).x = g.origText.x + dx;
       (layer as any).y = g.origText.y + dy;
     }
-    this.requestRender();
+    this.requestRenderDirty(); // in-place edit: bust the composite cache
   }
   private moveUp(): void {
     const s = this.store.getState();
@@ -859,7 +867,7 @@ export class InteractionController {
       exposure: this.num(toolId, 'exposure', 50) / 100,
       range: String(this.opt(toolId, 'range', 'Midtones')),
     });
-    this.requestRender();
+    this.requestRenderDirty(); // brush mutates pixelData in place
   }
 
   // =========================================================================
@@ -1008,7 +1016,7 @@ export class InteractionController {
     const layer = this.store.getState().document?.layers.find((l) => l.id === id);
     if (layer && layer.type === 'vector') {
       (layer as VectorLayer).paths = [path];
-      this.requestRender();
+      this.requestRenderDirty(); // vector path mutated in place
     }
     this.overlay = { kind: 'shape', shape: toolId, x: x0, y: y0, w: aw, h: ah };
   }

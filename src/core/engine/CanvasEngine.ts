@@ -55,6 +55,8 @@ export interface RenderInput {
   activeLayerId: string | null;
   chrome?: string;
   textColor?: string;
+  /** Monotonic document revision; the composite cache rebuilds only when this changes. */
+  revision?: number;
 }
 
 export class CanvasEngine {
@@ -64,8 +66,18 @@ export class CanvasEngine {
   private cssWidth = 0;
   private cssHeight = 0;
 
-  private comp: HTMLCanvasElement;
   private layerCanvases: Map<string, HTMLCanvasElement> = new Map();
+
+  // Composite cache (Part A): the expensive full-image composite is rebuilt only when the
+  // document revision / artboard size / preview scale changes — not on every pan/cursor/ants
+  // frame. `compositeDirty` forces a rebuild for in-place pixel edits during a gesture.
+  private compositeCache: HTMLCanvasElement | null = null;
+  private compositeKey = '';
+  private compositeDirty = true;
+  private previewMode = false;
+  private readonly PREVIEW_MAX_EDGE = 1800;
+  /** Number of times the full composite was actually (re)built — for tests/diagnostics. */
+  compositeBuilds = 0;
 
   // Cached marching-ants path for magic masks (rebuilt only when the selection changes).
   private antsCacheSel: SelectionData | null = null;
@@ -75,11 +87,25 @@ export class CanvasEngine {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    const ctx = canvas.getContext('2d', { alpha: true, desynchronized: true, willReadFrequently: true });
+    // No `desynchronized` — with the composite cache, frames are cheap; its partial-present
+    // behavior was what caused the white flash between the artboard fill and the slow composite.
+    const ctx = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
     if (!ctx) throw new Error('Could not get 2D context');
     this.ctx = ctx;
     this.dpr = window.devicePixelRatio || 1;
-    this.comp = document.createElement('canvas');
+  }
+
+  /** Force the composite to rebuild on the next render (used after in-place pixel edits). */
+  invalidateComposite(): void {
+    this.compositeDirty = true;
+  }
+
+  /** Toggle reduced-resolution compositing for responsive slider/brush gestures (Part A). */
+  setPreviewMode(on: boolean): void {
+    if (this.previewMode !== on) {
+      this.previewMode = on;
+      this.compositeDirty = true;
+    }
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -143,13 +169,14 @@ export class CanvasEngine {
       ctx.fillRect(ab.x, ab.y, ab.width, ab.height);
     }
 
-    // Composite all layers into the artboard-resolution offscreen.
-    const comp = this.compositeLayers(doc, ab);
-    // Crisp 1:1 pixels at zoom >= 1; high-quality interpolation when fitting large images
-    // to a smaller view so downscaled photos look smooth, not aliased. (Part C)
-    ctx.imageSmoothingEnabled = vp.zoom < 1;
-    if (vp.zoom < 1) ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(comp, ab.x, ab.y);
+    // Composite via the cache — rebuilt only when the document/size/preview-scale changes,
+    // so pan/zoom/cursor/ants frames are O(viewport), not O(image). (Part A)
+    const comp = this.getComposite(doc, ab, input.revision ?? 0);
+    // Crisp 1:1 pixels only at zoom >= 1 with a full-res composite; smooth (high quality)
+    // when fitting large images down OR upscaling a reduced-resolution preview.
+    ctx.imageSmoothingEnabled = vp.zoom < 1 || this.previewMode;
+    if (ctx.imageSmoothingEnabled) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(comp, ab.x, ab.y, ab.width, ab.height);
 
     // Artboard hairline border.
     ctx.lineWidth = 1 / vp.zoom;
@@ -234,14 +261,43 @@ export class CanvasEngine {
   // Compositing
   // -------------------------------------------------------------------------
 
-  private compositeLayers(doc: Document, ab: Artboard): HTMLCanvasElement {
-    const comp = this.comp;
-    if (comp.width !== ab.width || comp.height !== ab.height) {
-      comp.width = ab.width;
-      comp.height = ab.height;
+  private previewScale(ab: Artboard): number {
+    if (!this.previewMode) return 1;
+    const longest = Math.max(ab.width, ab.height);
+    return longest > this.PREVIEW_MAX_EDGE ? this.PREVIEW_MAX_EDGE / longest : 1;
+  }
+
+  /** Return the cached composite, rebuilding only when revision/size/preview-scale changes. */
+  private getComposite(doc: Document, ab: Artboard, revision: number): HTMLCanvasElement {
+    const scale = this.previewScale(ab);
+    const key = `${revision}|${ab.id}|${ab.width}x${ab.height}|${scale.toFixed(4)}`;
+    if (!this.compositeCache) this.compositeCache = document.createElement('canvas');
+    if (this.compositeDirty || key !== this.compositeKey) {
+      this.compositeLayers(doc, ab, scale, this.compositeCache);
+      this.compositeKey = key;
+      this.compositeDirty = false;
     }
-    const cctx = comp.getContext('2d', { willReadFrequently: true })!;
-    cctx.setTransform(1, 0, 0, 1, 0, 0);
+    return this.compositeCache;
+  }
+
+  /** Composite all layers into `target` at the given scale (1 = full artboard resolution). */
+  private compositeLayers(
+    doc: Document,
+    ab: Artboard,
+    scale: number,
+    target: HTMLCanvasElement
+  ): HTMLCanvasElement {
+    this.compositeBuilds++;
+    const cw = Math.max(1, Math.round(ab.width * scale));
+    const ch = Math.max(1, Math.round(ab.height * scale));
+    if (target.width !== cw || target.height !== ch) {
+      target.width = cw;
+      target.height = ch;
+    }
+    const cctx = target.getContext('2d', { willReadFrequently: true })!;
+    cctx.setTransform(scale, 0, 0, scale, 0, 0); // draw in artboard coords; output is scaled
+    cctx.imageSmoothingEnabled = true;
+    cctx.imageSmoothingQuality = 'high';
     cctx.clearRect(0, 0, ab.width, ab.height);
 
     const layers = [...doc.layers].sort((a, b) => a.order - b.order);
@@ -249,7 +305,7 @@ export class CanvasEngine {
       if (!layer.visible || layer.opacity <= 0) continue;
 
       if (layer.type === 'adjustment') {
-        this.applyAdjustmentLayer(cctx, layer as AdjustmentLayer, ab);
+        this.applyAdjustmentLayer(cctx, layer as AdjustmentLayer, cw, ch);
         continue;
       }
 
@@ -265,16 +321,18 @@ export class CanvasEngine {
       cctx.globalAlpha = 1;
       cctx.globalCompositeOperation = 'source-over';
     }
-    return comp;
+    return target;
   }
 
   private applyAdjustmentLayer(
     cctx: CanvasRenderingContext2D,
     layer: AdjustmentLayer,
-    ab: Artboard
+    pw: number,
+    ph: number
   ): void {
-    // Snapshot composite-so-far, run the adjustment, blend back within mask + opacity.
-    const region = cctx.getImageData(0, 0, ab.width, ab.height);
+    // Snapshot composite-so-far (device pixels — getImageData ignores the transform), run the
+    // adjustment, blend back within opacity. pw/ph are the target's device dimensions.
+    const region = cctx.getImageData(0, 0, pw, ph);
     const src = new ImageData(new Uint8ClampedArray(region.data), region.width, region.height);
     const adjusted = Adjustments.apply(src, layer.adjustmentType, layer.settings);
     const out = region.data;
@@ -645,7 +703,6 @@ export class CanvasEngine {
    */
   composeArtboardCopy(doc: Document, flattenBg = false): HTMLCanvasElement {
     const ab = CanvasEngine.activeArtboard(doc);
-    const comp = this.compositeLayers(doc, ab);
     const out = document.createElement('canvas');
     out.width = ab.width;
     out.height = ab.height;
@@ -654,6 +711,9 @@ export class CanvasEngine {
       octx.fillStyle = ab.backgroundColor ? rgbaToCss(ab.backgroundColor) : '#ffffff';
       octx.fillRect(0, 0, ab.width, ab.height);
     }
+    // Always a fresh, full-resolution composite (export/eyedropper/wand/thumbnail must be exact
+    // and must not touch the on-screen cache).
+    const comp = this.compositeLayers(doc, ab, 1, document.createElement('canvas'));
     octx.drawImage(comp, 0, 0);
     return out;
   }
