@@ -1,6 +1,6 @@
 /**
  * Stratum Adjustments Engine
- * Image adjustment algorithms for Photoshop/Lightroom-style editing
+ * Image adjustment algorithms for raster / photo-develop-style editing
  */
 
 import type { AdjustmentType, AdjustmentSettings, HSLAdjustments } from '../../types';

@@ -155,7 +155,7 @@ export interface VectorEffect {
 }
 
 // ============================================================================
-// ADJUSTMENT TYPES (Photoshop/Lightroom adjustments)
+// ADJUSTMENT TYPES (raster / photo adjustments)
 // ============================================================================
 
 export type AdjustmentType = 
@@ -187,7 +187,7 @@ export type AdjustmentType =
   | 'gradientMap';
 
 export interface AdjustmentSettings {
-  // Basic Lightroom-style adjustments
+  // Basic develop-style adjustments
   exposure?: number; // -10 to +10
   contrast?: number; // -100 to +100
   highlights?: number; // -100 to +100

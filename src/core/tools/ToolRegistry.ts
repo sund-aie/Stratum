@@ -1,15 +1,15 @@
 /**
  * Stratum - Complete Tool System
- * Implements all Photoshop, Illustrator, and Lightroom tools from the 2026 workflow guide
+ * Implements all raster, vector, and photo/develop tools from the 2026 workflow guide
  */
 
 import type { ToolDefinition, ToolOption, ToolCategory, SelectionData, VectorPath, AnchorPoint } from '../../types';
 
 // ============================================================================
-// PHOTOSHOP TOOLS
+// RASTER TOOLS
 // ============================================================================
 
-export const photoshopTools: ToolDefinition[] = [
+export const rasterTools: ToolDefinition[] = [
   // Selection Tools
   {
     id: 'move',
@@ -733,10 +733,10 @@ export const photoshopTools: ToolDefinition[] = [
 ];
 
 // ============================================================================
-// ILLUSTRATOR TOOLS
+// VECTOR TOOLS
 // ============================================================================
 
-export const illustratorTools: ToolDefinition[] = [
+export const vectorTools: ToolDefinition[] = [
   // Selection Tools
   {
     id: 'selection',
@@ -1255,10 +1255,10 @@ export const illustratorTools: ToolDefinition[] = [
 ];
 
 // ============================================================================
-// LIGHTROOM TOOLS
+// PHOTO / DEVELOP TOOLS
 // ============================================================================
 
-export const lightroomTools: ToolDefinition[] = [
+export const photoTools: ToolDefinition[] = [
   // Library Module Tools
   {
     id: 'libraryGrid',
@@ -1498,9 +1498,9 @@ export const lightroomTools: ToolDefinition[] = [
 // ============================================================================
 
 export const allTools: ToolDefinition[] = [
-  ...photoshopTools,
-  ...illustratorTools,
-  ...lightroomTools,
+  ...rasterTools,
+  ...vectorTools,
+  ...photoTools,
 ];
 
 export function getToolById(id: string): ToolDefinition | undefined {

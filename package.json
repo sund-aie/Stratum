@@ -1,7 +1,7 @@
 {
   "name": "unified-canvas",
   "version": "1.0.0",
-  "description": "Professional Image Editor combining Photoshop, Illustrator, and Lightroom",
+  "description": "Stratum / Unified Canvas - a browser-based raster, vector, and photo editor",
   "type": "module",
   "scripts": {
     "dev": "vite",

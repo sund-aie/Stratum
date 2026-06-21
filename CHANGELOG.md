@@ -1,6 +1,6 @@
 # Stratum / Unified Canvas — Changelog
 
-Resurrection of the editor into a functional app with a Photoshop CS2 (2006) skin.
+Resurrection of the editor into a functional app with a classic 2006 (CS2-style) gray skin.
 
 ## Ground-truth deltas vs. the audit
 - Confirmed the real file tree in §1.1 exactly (no stale `src/engine` + `src/ui` 68-file tree present).
