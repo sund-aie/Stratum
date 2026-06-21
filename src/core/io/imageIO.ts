@@ -182,8 +182,10 @@ export async function decodeImageFile(
       return null;
     }
     try {
-      const data = await fileToImageData(preview);
-      toast?.(`Opened the embedded preview from a ${format.label} file — full RAW development isn't supported in-browser.`);
+      const data = await fileToImageData(preview.blob);
+      toast?.(
+        `Opened the embedded preview from a ${format.label} file (${preview.width} × ${preview.height}) — full RAW development isn't supported in-browser.`
+      );
       return { data, format, fromRawPreview: true };
     } catch {
       toast?.(`Could not decode the embedded preview from ${format.label}.`);

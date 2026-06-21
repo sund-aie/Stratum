@@ -59,24 +59,40 @@ describe('detectImageFormat (Part B)', () => {
 });
 
 describe('extractRawPreview (Part B)', () => {
-  const makeJpeg = (payload: number) => {
-    const b = new Uint8Array(payload + 4);
-    b[0] = 0xff;
-    b[1] = 0xd8;
-    b[b.length - 2] = 0xff;
-    b[b.length - 1] = 0xd9;
-    return b;
+  // Build a minimal JPEG stream: SOI, one SOFn segment (with dims/precision/components),
+  // `pad` bytes of (FF-free) entropy, EOI.
+  const jpegStream = (
+    marker: number,
+    w: number,
+    h: number,
+    comps: number,
+    precision: number,
+    pad: number
+  ): number[] => {
+    const sofLen = 8 + 3 * comps; // 2 len + precision + h(2) + w(2) + Nf + 3*Nf
+    const out: number[] = [0xff, 0xd8, 0xff, marker, (sofLen >> 8) & 0xff, sofLen & 0xff, precision, (h >> 8) & 0xff, h & 0xff, (w >> 8) & 0xff, w & 0xff, comps];
+    for (let i = 0; i < 3 * comps; i++) out.push(0);
+    for (let i = 0; i < pad; i++) out.push(0x00);
+    out.push(0xff, 0xd9);
+    return out;
   };
 
-  it('returns the largest embedded JPEG stream', () => {
-    const small = makeJpeg(50); // 54 bytes (ignored, < 1024)
-    const large = makeJpeg(1200); // 1204 bytes
-    const buf = new Uint8Array(small.length + 5 + large.length);
-    buf.set(small, 0);
-    buf.set(large, small.length + 5);
-    const blob = extractRawPreview(buf);
-    expect(blob).not.toBeNull();
-    expect(blob!.size).toBe(large.length);
+  it('picks the largest decodable RGB preview, ignoring thumbnail and lossless mosaic', () => {
+    const thumbnail = jpegStream(0xc0, 160, 120, 3, 8, 20); // tiny SOF0 RGB
+    const preview = jpegStream(0xc0, 600, 400, 3, 8, 200); // larger-by-pixels SOF0 RGB (the answer)
+    const mosaic = jpegStream(0xc3, 300, 300, 4, 14, 5000); // lossless SOF3, 4-comp 14-bit, largest by BYTES
+
+    const buf = new Uint8Array([...thumbnail, 0, 0, ...preview, 0, 0, ...mosaic]);
+    const result = extractRawPreview(buf);
+    expect(result).not.toBeNull();
+    expect(result!.width).toBe(600);
+    expect(result!.height).toBe(400);
+    expect(result!.blob.type).toBe('image/jpeg');
+  });
+
+  it('returns null when the only stream is a lossless (SOF3) mosaic', () => {
+    const mosaic = jpegStream(0xc3, 1336, 3516, 4, 14, 2000);
+    expect(extractRawPreview(new Uint8Array(mosaic))).toBeNull();
   });
 
   it('returns null when no JPEG is present', () => {
