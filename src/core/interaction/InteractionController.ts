@@ -20,7 +20,7 @@ import { CanvasEngine, Overlay } from '../engine/CanvasEngine';
 import { toolEngine } from '../tools/ToolEngine';
 import { getToolById } from '../tools/ToolRegistry';
 import { screenToArtboard, ViewTransform } from './coords';
-import { rasterizeSelection } from './selection';
+import { rasterizeSelection, selectionMaskForLayer } from './selection';
 import { uid, transparentImageData } from '../io/imageIO';
 import * as paint from './paintOps';
 
@@ -258,11 +258,22 @@ export class InteractionController {
   // Selection mask for gesture clipping
   // -------------------------------------------------------------------------
 
+  /** Selection mask in the ACTIVE raster layer's local space (offset/native-size aware). */
   private gestureSelMask(): Uint8Array | null {
     const s = this.store.getState();
     const ab = this.artboard();
     if (!s.selection || !ab) return null;
-    return rasterizeSelection(s.selection, ab.width, ab.height);
+    const r = this.activeRaster();
+    if (!r || !r.pixelData) return rasterizeSelection(s.selection, ab.width, ab.height);
+    return selectionMaskForLayer(
+      s.selection,
+      ab.width,
+      ab.height,
+      r.pixelData.width,
+      r.pixelData.height,
+      r.x ?? 0,
+      r.y ?? 0
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -758,7 +769,14 @@ export class InteractionController {
       for (const layer of doc.layers) {
         if (layer.type === 'raster' && (layer as RasterLayer).pixelData) {
           const rl = layer as RasterLayer;
-          rl.pixelData = paint.cropImageData(rl.pixelData!, cx, cy, cw, ch);
+          const ox = rl.x ?? 0;
+          const oy = rl.y ?? 0;
+          // Sample from the layer's own buffer at the (offset-adjusted) crop origin and
+          // re-anchor the layer to the new artboard top-left. Default layers (offset 0,0,
+          // sized to the artboard) behave exactly as before.
+          rl.pixelData = paint.cropImageData(rl.pixelData!, cx - ox, cy - oy, cw, ch);
+          rl.x = 0;
+          rl.y = 0;
           rl.width = cw;
           rl.height = ch;
         }
@@ -832,7 +850,10 @@ export class InteractionController {
       mask: this.gesture?.selMask ?? null,
       color: s.foreground,
     };
-    paint.strokeSegment(raster.pixelData, x0, y0, x1, y1, toolId, params, {
+    // Convert artboard-space stroke coords to the layer's local space (Part A).
+    const ox = raster.x ?? 0;
+    const oy = raster.y ?? 0;
+    paint.strokeSegment(raster.pixelData, x0 - ox, y0 - oy, x1 - ox, y1 - oy, toolId, params, {
       cloneSource: this.cloneSource,
       cloneOffset: this.gesture?.cloneOffset ?? null,
       exposure: this.num(toolId, 'exposure', 50) / 100,
@@ -879,8 +900,10 @@ export class InteractionController {
     }
     const tol = this.num('paintBucket', 'tolerance', 32);
     const mask = this.gestureSelMask();
+    const ox = raster.x ?? 0;
+    const oy = raster.y ?? 0;
     this.store.commit('Paint Bucket', () => {
-      paint.floodFill(raster.pixelData!, Math.floor(x), Math.floor(y), this.store.getState().foreground, tol, mask);
+      paint.floodFill(raster.pixelData!, Math.floor(x - ox), Math.floor(y - oy), this.store.getState().foreground, tol, mask);
       this.store.dispatch({ type: 'UPDATE_LAYER', payload: { id: raster.id, changes: {} } });
     });
     this.requestRender();
@@ -923,13 +946,15 @@ export class InteractionController {
     const shape = String(this.opt('gradient', 'type', 'Linear'));
     const reverse = this.bool('gradient', 'reverse', false);
     const mask = this.gestureSelMask();
+    const ox = raster.x ?? 0;
+    const oy = raster.y ?? 0;
     this.store.commit('Gradient', () => {
       paint.drawGradient(
         raster.pixelData!,
-        o.x1,
-        o.y1,
-        o.x2,
-        o.y2,
+        o.x1 - ox,
+        o.y1 - oy,
+        o.x2 - ox,
+        o.y2 - oy,
         s.foreground,
         s.background,
         shape,

@@ -28,7 +28,14 @@ export interface RasterLayer extends BaseLayer {
   type: 'raster';
   width: number;
   height: number;
+  /**
+   * Pixel buffer. May be ANY size — it is NOT required to equal the artboard.
+   * Imported/placed images keep their native resolution here.
+   */
   pixelData?: ImageData;
+  /** Top-left offset of pixelData in artboard space (defaults to 0,0). May be negative. */
+  x?: number;
+  y?: number;
   source?: string; // URL or base64
 }
 
@@ -399,6 +406,8 @@ export interface DocumentMetadata {
   bitsPerChannel: 8 | 16 | 32;
   /** Resolution in pixels-per-inch; px is the canvas's internal unit. */
   resolution?: number;
+  /** Human-readable label of the source file format (e.g. "JPEG", "CR2 (Canon RAW)"). */
+  sourceFormat?: string;
 }
 
 // ============================================================================

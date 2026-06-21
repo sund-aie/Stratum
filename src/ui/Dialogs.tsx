@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { RGBAColor } from '../types';
 import type { WorkspaceMode } from '../core/state/store';
 import { rgbToHex, hexToRgb, rgbToHsv, hsvToRgb, rgbaToCss } from '../core/color/color';
+import { Icon } from './icons';
 
 export interface NewDocResult {
   width: number;
@@ -247,6 +248,71 @@ export const CanvasSizeDialog: React.FC<{ initW: number; initH: number; onCancel
       <div className="row"><span className="label" style={{ width: 60 }}>Height</span>
         <input type="number" className="ps-input" style={{ width: 90 }} value={h} onChange={(e) => setH(Math.max(1, +e.target.value))} /></div>
       <div className="dim">Content anchored top-left; larger sizes pad with transparency.</div>
+    </Modal>
+  );
+};
+
+// ---------------------------------------------------------------------------
+export const ImageSizeDialog: React.FC<{
+  initW: number;
+  initH: number;
+  initRes: number;
+  onCancel: () => void;
+  onApply: (w: number, h: number, resample: boolean, res: number) => void;
+}> = ({ initW, initH, initRes, onCancel, onApply }) => {
+  const [w, setW] = useState(initW);
+  const [h, setH] = useState(initH);
+  const [res, setRes] = useState(initRes);
+  const [resample, setResample] = useState(true);
+  const [constrain, setConstrain] = useState(true);
+  const aspect = initW / initH;
+
+  const changeW = (val: number) => {
+    setW(val);
+    if (constrain) setH(Math.max(1, Math.round(val / aspect)));
+  };
+  const changeH = (val: number) => {
+    setH(val);
+    if (constrain) setW(Math.max(1, Math.round(val * aspect)));
+  };
+
+  return (
+    <Modal
+      title="Image Size"
+      onClose={onCancel}
+      footer={
+        <>
+          <div className="ps-btn" onClick={onCancel}>Cancel</div>
+          <div className="ps-btn" onClick={() => onApply(Math.max(1, w), Math.max(1, h), resample, res)}>OK</div>
+        </>
+      }
+    >
+      <div className="dim" style={{ fontSize: 10 }}>
+        Current: {initW} × {initH} px
+      </div>
+      <div className="row">
+        <span className="label" style={{ width: 70 }}>Width</span>
+        <input type="number" className="ps-input" style={{ width: 90 }} value={w} onChange={(e) => changeW(Math.max(1, +e.target.value))} />
+        <span className="label">px</span>
+      </div>
+      <div className="row">
+        <span className="label" style={{ width: 70 }}>Height</span>
+        <input type="number" className="ps-input" style={{ width: 90 }} value={h} onChange={(e) => changeH(Math.max(1, +e.target.value))} />
+        <span className="label">px</span>
+      </div>
+      <div className="row">
+        <span className="label" style={{ width: 70 }}>Resolution</span>
+        <input type="number" className="ps-input" style={{ width: 60 }} value={res} onChange={(e) => setRes(Math.max(1, +e.target.value))} />
+        <span className="label">ppi</span>
+      </div>
+      <div className="row">
+        <div className="ps-checkbox" onClick={() => setConstrain((c) => !c)}>{constrain && <Icon name="check" size={11} />}</div>
+        <span className="label">Constrain proportions</span>
+      </div>
+      <div className="row">
+        <div className="ps-checkbox" onClick={() => setResample((r) => !r)}>{resample && <Icon name="check" size={11} />}</div>
+        <span className="label">Resample (high quality)</span>
+      </div>
     </Modal>
   );
 };

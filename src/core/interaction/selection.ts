@@ -86,6 +86,38 @@ export function rasterizeSelection(
   return mask;
 }
 
+/**
+ * Build a selection mask in a layer's LOCAL pixel space (so it lines up with a layer
+ * whose buffer is offset and/or a different size than the artboard). Selection masks
+ * live in artboard space; this samples them into layer space. The default case
+ * (offset 0,0 and layer sized to the artboard) returns the artboard mask unchanged.
+ */
+export function selectionMaskForLayer(
+  sel: SelectionData,
+  abW: number,
+  abH: number,
+  layerW: number,
+  layerH: number,
+  ox: number,
+  oy: number
+): Uint8Array {
+  const abMask = rasterizeSelection(sel, abW, abH);
+  if (ox === 0 && oy === 0 && layerW === abW && layerH === abH) return abMask;
+  const out = new Uint8Array(layerW * layerH);
+  for (let ly = 0; ly < layerH; ly++) {
+    const ay = ly + oy;
+    if (ay < 0 || ay >= abH) continue;
+    const abRow = ay * abW;
+    const outRow = ly * layerW;
+    for (let lx = 0; lx < layerW; lx++) {
+      const ax = lx + ox;
+      if (ax < 0 || ax >= abW) continue;
+      out[outRow + lx] = abMask[abRow + ax];
+    }
+  }
+  return out;
+}
+
 export function pointInPolygon(px: number, py: number, pts: AnchorPoint[]): boolean {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {

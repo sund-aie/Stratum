@@ -24,6 +24,7 @@ import {
   NewDocumentDialog,
   ExportDialog,
   CanvasSizeDialog,
+  ImageSizeDialog,
   ColorPickerDialog,
   TextDialog,
 } from './ui/Dialogs';
@@ -32,6 +33,7 @@ type Dialog =
   | { type: 'new' }
   | { type: 'export' }
   | { type: 'canvasSize' }
+  | { type: 'imageSize' }
   | { type: 'color'; which: 'fg' | 'bg' }
   | { type: 'text'; x: number; y: number }
   | null;
@@ -69,6 +71,7 @@ function App() {
       openExportDialog: () => setDialog({ type: 'export' }),
       openColorPicker: (which) => setDialog({ type: 'color', which }),
       openCanvasSizeDialog: () => setDialog({ type: 'canvasSize' }),
+      openImageSizeDialog: () => setDialog({ type: 'imageSize' }),
       toast: showToast,
     };
     const commands = createCommands({ engine, controller, ui });
@@ -146,11 +149,16 @@ function App() {
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/') && commandsRef.current) {
-      const name = file.name.replace(/\.[^.]+$/, '');
-      if (state.document) commandsRef.current.placeImageFile(file, name);
-      else commandsRef.current.openImageFile(file, name);
-    }
+    const c = commandsRef.current;
+    if (!file || !c) return; // RAW files may have empty MIME — let the decoder sniff content
+    const name = file.name.replace(/\.[^.]+$/, '');
+    const d = state.document;
+    // If there's no document or just a freshly-created blank canvas (one layer, nothing
+    // done yet), open the drop as a NEW full-resolution document. Otherwise place it at
+    // native size on top of the real composition. (Part A)
+    const blank = !d || (d.layers.length <= 1 && !getStore().canUndo());
+    if (blank) c.openImageFile(file, name);
+    else c.placeImageFile(file, name);
   };
 
   const commands = commandsRef.current;
@@ -323,6 +331,18 @@ function App() {
           onCancel={() => setDialog(null)}
           onApply={(w, h) => {
             commands.resizeCanvas(w, h);
+            setDialog(null);
+          }}
+        />
+      )}
+      {dialog?.type === 'imageSize' && commands && state.document && (
+        <ImageSizeDialog
+          initW={CanvasEngine.activeArtboard(state.document).width}
+          initH={CanvasEngine.activeArtboard(state.document).height}
+          initRes={state.document.metadata.resolution ?? 72}
+          onCancel={() => setDialog(null)}
+          onApply={(w, h, resample, res) => {
+            commands.resampleImage(w, h, resample, res);
             setDialog(null);
           }}
         />

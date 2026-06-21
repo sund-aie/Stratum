@@ -28,6 +28,12 @@ export const StatusBar: React.FC<{ status: { x: number; y: number; hint: string 
         title="Zoom level"
       />
       <div className="sep" />
+      {doc?.metadata.sourceFormat && (
+        <>
+          <span>{doc.metadata.sourceFormat}</span>
+          <div className="sep" />
+        </>
+      )}
       <span>{ab ? `${ab.width} × ${ab.height} px` : 'No document'}</span>
       <div className="sep" />
       <span>{doc?.metadata.bitsPerChannel ?? 8}-bit / {doc?.metadata.colorProfile ?? 'sRGB'}</span>

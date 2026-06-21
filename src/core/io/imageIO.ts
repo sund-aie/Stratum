@@ -4,6 +4,7 @@
  * New raster layer allocates a transparent ImageData so paint tools have a buffer.
  */
 import type { Document, RasterLayer, Layer, Artboard, RGBAColor } from '../../types';
+import { detectImageFormat, extractRawPreview, type FormatInfo } from './formatDetect';
 
 let idCounter = 0;
 export function uid(prefix = 'id'): string {
@@ -148,6 +149,55 @@ export function documentFromImageData(data: ImageData, name: string): Document {
   // fix activeArtboardId
   doc.activeArtboardId = doc.artboards[0].id;
   return doc;
+}
+
+/** Accept string for image pickers — standard web formats plus camera RAW (detected by content). */
+export const ACCEPT_IMAGES = '.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.tif,.tiff,image/*';
+
+export interface DecodeResult {
+  data: ImageData;
+  format: FormatInfo;
+  /** Set when the data came from a RAW file's embedded preview. */
+  fromRawPreview?: boolean;
+}
+
+/**
+ * Decode any supported image file to ImageData with format detection (Part B).
+ * Standard web formats go through the browser decoder; RAW files open their embedded
+ * full-size JPEG preview. Returns null (after toasting) when nothing is decodable.
+ */
+export async function decodeImageFile(
+  file: Blob,
+  toast?: (msg: string) => void
+): Promise<DecodeResult | null> {
+  const filename = (file as File).name;
+  const head = new Uint8Array(await file.slice(0, 65536).arrayBuffer());
+  const format = detectImageFormat(head, filename);
+
+  if (format.isRaw) {
+    const all = new Uint8Array(await file.arrayBuffer());
+    const preview = extractRawPreview(all);
+    if (!preview) {
+      toast?.(`No embedded preview found in ${format.label} — full RAW development isn't supported in-browser.`);
+      return null;
+    }
+    try {
+      const data = await fileToImageData(preview);
+      toast?.(`Opened the embedded preview from a ${format.label} file — full RAW development isn't supported in-browser.`);
+      return { data, format, fromRawPreview: true };
+    } catch {
+      toast?.(`Could not decode the embedded preview from ${format.label}.`);
+      return null;
+    }
+  }
+
+  try {
+    const data = await fileToImageData(file);
+    return { data, format };
+  } catch {
+    toast?.(`${format.label} isn't decodable in this browser.`);
+    return null;
+  }
 }
 
 /** Open a file picker; resolves with selected files (or empty). */
