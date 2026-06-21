@@ -233,7 +233,8 @@ body {
 
 /* ---- Toolbox ------------------------------------------------------------ */
 .toolbox {
-  width: calc(var(--ps-tool-size) + 12px);
+  width: calc(var(--ps-tool-size) + 14px);
+  min-width: calc(var(--ps-tool-size) + 14px);
   background: var(--ps-chrome);
   border-right: 1px solid var(--ps-bevel-shadow);
   box-shadow: inset -1px 0 0 var(--ps-bevel-dark);
@@ -402,21 +403,35 @@ body {
 }
 .toolbox-toggles {
   display: flex;
-  gap: 3px;
-  margin-top: 6px;
+  flex-wrap: nowrap;
+  gap: 1px;
+  margin-top: 5px;
 }
+/* Footer controls must fit inside the narrow column (3 across within ~40px). */
 .mini-btn {
-  width: 18px;
-  height: 18px;
+  width: 12px;
+  height: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--ps-chrome);
+  border: 1px solid var(--ps-bevel-shadow);
+  border-top-color: var(--ps-bevel-light);
+  border-left-color: var(--ps-bevel-light);
   cursor: pointer;
   color: var(--ps-text);
 }
 .mini-btn.active {
   background: var(--ps-tool-active-bg);
+  border-color: var(--ps-bevel-shadow) var(--ps-bevel-light) var(--ps-bevel-light) var(--ps-bevel-shadow);
+}
+/* Double-column toolbox can afford slightly larger, more spaced footer controls. */
+.toolbox.dbl .mini-btn {
+  width: 16px;
+  height: 16px;
+}
+.toolbox.dbl .toolbox-toggles {
+  gap: 2px;
 }
 
 /* ---- Palettes (docked, tabbed) ------------------------------------------ */

@@ -29,7 +29,10 @@ CS2 glyphs — there are no emoji anywhere in the UI.
 
 | Area | Status |
 |---|---|
-| Open / Place / drag-drop image, New document, project save/load (.stratum), Export PNG/JPEG/WebP | ✅ |
+| Open / Place / drag-drop image at **native resolution** (no downsampling), New document, project save/load (.stratum), Export PNG/JPEG/WebP | ✅ |
+| Format detection by magic bytes (PNG/JPEG/GIF/WebP/BMP/TIFF/AVIF/HEIC) + camera **RAW** (CR2/CR3/NEF/ARW/DNG/ORF/RW2/RAF) via embedded-preview extraction; detected format shown in the status bar | ✅ |
+| Image Size dialog with high-quality resampling (constrain proportions, resample on/off) — distinct from Canvas Size | ✅ |
+| High-quality smoothing when fitting large images; non-destructive adjustment sliders coalesced to one render per frame | ✅ |
 | Viewport: zoom-to-cursor, pan (space/hand), fit / actual pixels, DPR-correct, ResizeObserver | ✅ |
 | Compositing: 16 blend modes, per-layer opacity, raster + vector (Path2D) + text + fill + adjustment layers | ✅ |
 | Move (raster/vector/text), arrow-nudge | ✅ |

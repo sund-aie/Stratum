@@ -9,14 +9,15 @@ import { InteractionController } from './interaction/InteractionController';
 import {
   newDocument as ioNewDocument,
   documentFromImageData,
-  fileToImageData,
+  decodeImageFile,
+  ACCEPT_IMAGES,
   newRasterLayer,
   pickFiles,
   uid,
   transparentImageData,
 } from './io/imageIO';
 import { exportDocument, saveProject, loadProject } from './io/exporter';
-import { rasterizeSelection, maskBounds as selBounds } from './interaction/selection';
+import { rasterizeSelection, selectionMaskForLayer, maskBounds as selBounds } from './interaction/selection';
 import { RasterOps } from './engine/RasterOps';
 import { Adjustments } from './engine/Adjustments';
 
@@ -25,6 +26,7 @@ export interface CommandUI {
   openExportDialog: () => void;
   openColorPicker: (which: 'fg' | 'bg') => void;
   openCanvasSizeDialog: () => void;
+  openImageSizeDialog: () => void;
   toast: (msg: string) => void;
 }
 
@@ -78,41 +80,44 @@ export function createCommands(ctx: CommandCtx) {
       this.fitToScreen();
     },
     async openImage() {
-      const files = await pickFiles('image/*', false);
+      const files = await pickFiles(ACCEPT_IMAGES, false);
       if (!files.length) return;
-      const data = await fileToImageData(files[0]);
       const name = files[0].name.replace(/\.[^.]+$/, '');
-      setDoc(documentFromImageData(data, name));
-      store.dispatch({ type: 'SET_WORKSPACE_MODE', payload: 'pixel' });
-      this.fitToScreen();
+      return this.openImageFile(files[0], name);
     },
     async placeImage() {
       const d = doc();
       if (!d) return this.openImage();
-      const files = await pickFiles('image/*', false);
+      const files = await pickFiles(ACCEPT_IMAGES, false);
       if (!files.length) return;
-      const data = await fileToImageData(files[0]);
-      const ab = CanvasEngine.activeArtboard(d);
-      const layer = newRasterLayer(
-        files[0].name.replace(/\.[^.]+$/, ''),
-        ab.width,
-        ab.height,
-        d.layers.length,
-        placeOnArtboard(data, ab.width, ab.height)
-      );
-      store.commit('Place', () => store.dispatch({ type: 'ADD_LAYER', payload: layer }));
+      const decoded = await decodeImageFile(files[0], ui.toast);
+      if (!decoded) return;
+      await this.placeData(decoded.data, files[0].name.replace(/\.[^.]+$/, ''));
     },
     async openImageFile(file: Blob, name: string) {
-      const data = await fileToImageData(file);
-      setDoc(documentFromImageData(data, name));
+      const decoded = await decodeImageFile(file, ui.toast);
+      if (!decoded) return;
+      const newDoc = documentFromImageData(decoded.data, name);
+      newDoc.metadata.sourceFormat = decoded.format.label;
+      setDoc(newDoc);
+      store.dispatch({ type: 'SET_WORKSPACE_MODE', payload: 'pixel' });
       this.fitToScreen();
     },
     async placeImageFile(file: Blob, name: string) {
       const d = doc();
       if (!d) return this.openImageFile(file, name);
-      const data = await fileToImageData(file);
+      const decoded = await decodeImageFile(file, ui.toast);
+      if (!decoded) return;
+      await this.placeData(decoded.data, name);
+    },
+    /** Add an image at its NATIVE resolution as a centered offset layer (Part A). */
+    placeData(data: ImageData, name: string) {
+      const d = doc();
+      if (!d) return;
       const ab = CanvasEngine.activeArtboard(d);
-      const layer = newRasterLayer(name, ab.width, ab.height, d.layers.length, placeOnArtboard(data, ab.width, ab.height));
+      const layer = newRasterLayer(name, data.width, data.height, d.layers.length, data);
+      layer.x = Math.round((ab.width - data.width) / 2);
+      layer.y = Math.round((ab.height - data.height) / 2);
       store.commit('Place', () => store.dispatch({ type: 'ADD_LAYER', payload: layer }));
     },
     exportPng() {
@@ -154,10 +159,14 @@ export function createCommands(ctx: CommandCtx) {
         ui.toast('Fill needs a pixel layer');
         return;
       }
+      const rl = layer as RasterLayer;
       const sel = store.getState().selection;
-      const mask = sel ? rasterizeSelection(sel, ab.width, ab.height) : null;
+      // Layer-local mask so fill clips correctly on offset / native-size layers (Part A).
+      const mask = sel
+        ? selectionMaskForLayer(sel, ab.width, ab.height, rl.pixelData!.width, rl.pixelData!.height, rl.x ?? 0, rl.y ?? 0)
+        : null;
       store.commit('Fill', () => {
-        const data = (layer as RasterLayer).pixelData!.data;
+        const data = rl.pixelData!.data;
         const aa = Math.round(color.a * 255);
         for (let i = 0; i < data.length; i += 4) {
           if (mask && mask[i / 4] === 0) continue;
@@ -178,16 +187,19 @@ export function createCommands(ctx: CommandCtx) {
         ui.toast('Copy needs a pixel layer');
         return;
       }
-      const src = (layer as RasterLayer).pixelData!;
+      const rl = layer as RasterLayer;
+      const src = rl.pixelData!;
+      const ox = rl.x ?? 0;
+      const oy = rl.y ?? 0;
       const sel = store.getState().selection;
-      const mask = sel ? rasterizeSelection(sel, ab.width, ab.height) : null;
-      // bounds: selection bbox or whole layer
-      let bx = 0;
-      let by = 0;
+      const abMask = sel ? rasterizeSelection(sel, ab.width, ab.height) : null;
+      // bounds in artboard space: selection bbox, or the whole layer's footprint.
+      let bx = ox;
+      let by = oy;
       let bw = src.width;
       let bh = src.height;
-      if (mask) {
-        const b = selBounds(mask, ab.width, ab.height);
+      if (abMask) {
+        const b = selBounds(abMask, ab.width, ab.height);
         if (!b) {
           ui.toast('Nothing to copy');
           return;
@@ -200,11 +212,13 @@ export function createCommands(ctx: CommandCtx) {
       const out = new ImageData(bw, bh);
       for (let y = 0; y < bh; y++) {
         for (let x = 0; x < bw; x++) {
-          const sx = bx + x;
-          const sy = by + y;
-          if (sx >= src.width || sy >= src.height) continue;
-          if (mask && mask[sy * ab.width + sx] === 0) continue;
-          const si = (sy * src.width + sx) * 4;
+          const ax = bx + x; // artboard space
+          const ay = by + y;
+          if (abMask && abMask[ay * ab.width + ax] === 0) continue;
+          const lx = ax - ox; // layer-local
+          const ly = ay - oy;
+          if (lx < 0 || ly < 0 || lx >= src.width || ly >= src.height) continue;
+          const si = (ly * src.width + lx) * 4;
           const di = (y * bw + x) * 4;
           out.data[di] = src.data[si];
           out.data[di + 1] = src.data[si + 1];
@@ -453,7 +467,48 @@ export function createCommands(ctx: CommandCtx) {
     },
 
     imageSize() {
-      ui.toast('Image Size dialog: resampling not yet wired (use Crop / Export for now)');
+      ui.openImageSizeDialog();
+    },
+    /**
+     * Intentional, high-quality resize (Part E) — distinct from Canvas Size (crop/extend).
+     * With resample on, raster layers are resampled with high-quality interpolation and the
+     * artboard is rescaled; with it off, only the print resolution metadata changes.
+     */
+    resampleImage(width: number, height: number, resample: boolean, resolution?: number) {
+      const d = doc();
+      const ab = artboard();
+      if (!d || !ab) return;
+      store.commit('Image Size', () => {
+        if (resample) {
+          const sx = width / ab.width;
+          const sy = height / ab.height;
+          for (const layer of d.layers) {
+            if (layer.type === 'raster' && (layer as RasterLayer).pixelData) {
+              const rl = layer as RasterLayer;
+              const nlw = Math.max(1, Math.round(rl.pixelData!.width * sx));
+              const nlh = Math.max(1, Math.round(rl.pixelData!.height * sy));
+              rl.pixelData = resampleImageData(rl.pixelData!, nlw, nlh);
+              rl.width = nlw;
+              rl.height = nlh;
+              rl.x = Math.round((rl.x ?? 0) * sx);
+              rl.y = Math.round((rl.y ?? 0) * sy);
+            }
+          }
+          store.dispatch({
+            type: 'UPDATE_DOCUMENT',
+            payload: {
+              artboards: d.artboards.map((a) => (a.id === ab.id ? { ...a, width, height } : a)),
+              metadata: { ...d.metadata, resolution: resolution ?? d.metadata.resolution, modifiedAt: new Date() },
+            },
+          });
+        } else {
+          store.dispatch({
+            type: 'UPDATE_DOCUMENT',
+            payload: { metadata: { ...d.metadata, resolution: resolution ?? d.metadata.resolution } },
+          });
+        }
+      });
+      this.fitToScreen();
     },
     canvasSize() {
       ui.openCanvasSizeDialog();
@@ -466,9 +521,13 @@ export function createCommands(ctx: CommandCtx) {
         for (const layer of d.layers) {
           if (layer.type === 'raster' && (layer as RasterLayer).pixelData) {
             const rl = layer as RasterLayer;
-            rl.pixelData = cropToSize(rl.pixelData!, w, h);
-            rl.width = w;
-            rl.height = h;
+            // Artboard-aligned layers resize with the canvas (unchanged behavior); offset /
+            // native-size layers keep their buffer + offset and are clipped by the compositor.
+            if ((rl.x ?? 0) === 0 && (rl.y ?? 0) === 0) {
+              rl.pixelData = cropToSize(rl.pixelData!, w, h);
+              rl.width = w;
+              rl.height = h;
+            }
           }
         }
         store.dispatch({
@@ -533,24 +592,20 @@ function filterLabel(name: string): string {
 
 export type Commands = ReturnType<typeof createCommands>;
 
-function placeOnArtboard(data: ImageData, w: number, h: number): ImageData {
-  const out = transparentImageData(w, h);
+/** High-quality (bilinear/bicubic via the browser) resample of an ImageData. */
+function resampleImageData(src: ImageData, w: number, h: number): ImageData {
+  const tmp = document.createElement('canvas');
+  tmp.width = src.width;
+  tmp.height = src.height;
+  tmp.getContext('2d')!.putImageData(src, 0, 0);
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
-  const ctx = c.getContext('2d', { willReadFrequently: true })!;
-  const tmp = document.createElement('canvas');
-  tmp.width = data.width;
-  tmp.height = data.height;
-  tmp.getContext('2d')!.putImageData(data, 0, 0);
-  // center-fit
-  const scale = Math.min(w / data.width, h / data.height, 1);
-  const dw = data.width * scale;
-  const dh = data.height * scale;
-  ctx.drawImage(tmp, (w - dw) / 2, (h - dh) / 2, dw, dh);
-  const got = ctx.getImageData(0, 0, w, h);
-  out.data.set(got.data);
-  return out;
+  const cx = c.getContext('2d', { willReadFrequently: true })!;
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(tmp, 0, 0, w, h);
+  return cx.getImageData(0, 0, w, h);
 }
 
 export function defaultSettings(type: AdjustmentLayer['adjustmentType']): AdjustmentLayer['settings'] {

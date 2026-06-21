@@ -145,7 +145,10 @@ export class CanvasEngine {
 
     // Composite all layers into the artboard-resolution offscreen.
     const comp = this.compositeLayers(doc, ab);
+    // Crisp 1:1 pixels at zoom >= 1; high-quality interpolation when fitting large images
+    // to a smaller view so downscaled photos look smooth, not aliased. (Part C)
     ctx.imageSmoothingEnabled = vp.zoom < 1;
+    if (vp.zoom < 1) ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(comp, ab.x, ab.y);
 
     // Artboard hairline border.
@@ -254,7 +257,11 @@ export class CanvasEngine {
       if (!lc) continue;
       cctx.globalAlpha = layer.opacity;
       cctx.globalCompositeOperation = mapBlend(layer.blendMode);
-      cctx.drawImage(lc, 0, 0);
+      // Raster layers may be larger/smaller than the artboard and offset; draw at their
+      // top-left. Pixels outside the artboard are clipped by the comp canvas. (Part A)
+      const ox = layer.type === 'raster' ? (layer as RasterLayer).x ?? 0 : 0;
+      const oy = layer.type === 'raster' ? (layer as RasterLayer).y ?? 0 : 0;
+      cctx.drawImage(lc, ox, oy);
       cctx.globalAlpha = 1;
       cctx.globalCompositeOperation = 'source-over';
     }

@@ -173,25 +173,25 @@ const ColorControls: React.FC = () => {
           title="Edit in Standard Mode"
           onClick={() => state.quickMask && dispatch({ type: 'TOGGLE_QUICK_MASK' })}
         >
-          <Icon name="quickMaskOff" size={14} />
+          <Icon name="quickMaskOff" size={10} />
         </div>
         <div
           className={`mini-btn${state.quickMask ? ' active' : ''}`}
           title="Edit in Quick Mask Mode (Q)"
           onClick={() => !state.quickMask && dispatch({ type: 'TOGGLE_QUICK_MASK' })}
         >
-          <Icon name="quickMaskOn" size={14} />
+          <Icon name="quickMaskOn" size={10} />
         </div>
       </div>
       <div className="toolbox-toggles">
         <div className="mini-btn active" title="Standard Screen Mode">
-          <Icon name="screenStandard" size={14} />
+          <Icon name="screenStandard" size={10} />
         </div>
         <div className="mini-btn" title="Full Screen With Menu Bar">
-          <Icon name="screenFullMenu" size={14} />
+          <Icon name="screenFullMenu" size={10} />
         </div>
         <div className="mini-btn" title="Full Screen Mode">
-          <Icon name="screenFull" size={14} />
+          <Icon name="screenFull" size={10} />
         </div>
       </div>
     </div>
