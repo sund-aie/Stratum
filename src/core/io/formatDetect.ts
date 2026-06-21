@@ -79,11 +79,70 @@ export function detectImageFormat(bytes: Uint8Array, filename?: string): FormatI
   return { kind: 'unknown', mime: 'application/octet-stream', isRaw: false, label: e ? e.toUpperCase() : 'Unknown' };
 }
 
+export interface RawPreview {
+  blob: Blob;
+  width: number;
+  height: number;
+}
+
+interface SofInfo {
+  marker: number;
+  precision: number;
+  width: number;
+  height: number;
+  components: number;
+}
+
 /**
- * Extract the largest embedded JPEG stream (FF D8 … FF D9) from a RAW container as a Blob.
- * This is the full-size preview in nearly all RAW/DNG files. Returns null if none found.
+ * Parse the first Start-Of-Frame marker within a JPEG stream [start, end).
+ * Returns its marker code, bit precision, dimensions, and component count.
  */
-export function extractRawPreview(bytes: Uint8Array): Blob | null {
+function readSof(bytes: Uint8Array, start: number, end: number): SofInfo | null {
+  let p = start + 2; // skip SOI
+  while (p + 1 < end) {
+    if (bytes[p] !== 0xff) {
+      p++;
+      continue;
+    }
+    // Collapse any fill 0xFF bytes; `m` lands on the marker code.
+    let m = p + 1;
+    while (m < end && bytes[m] === 0xff) m++;
+    if (m >= end) break;
+    const marker = bytes[m];
+    // Standalone markers (no length): TEM, RSTn, SOI, EOI.
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+      p = m + 1;
+      continue;
+    }
+    if (m + 2 >= end) break;
+    const len = (bytes[m + 1] << 8) | bytes[m + 2];
+    if (len < 2) break;
+    // SOFn = 0xC0..0xCF, excluding C4 (DHT), C8 (JPG), CC (DAC).
+    const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) {
+      if (m + 8 >= end) break;
+      const precision = bytes[m + 3];
+      const height = (bytes[m + 4] << 8) | bytes[m + 5];
+      const width = (bytes[m + 6] << 8) | bytes[m + 7];
+      const components = bytes[m + 8];
+      return { marker, precision, width, height, components };
+    }
+    if (marker === 0xda) break; // SOS — entropy data begins; SOF would precede it
+    p = m + 1 + len;
+  }
+  return null;
+}
+
+/**
+ * Extract a RAW container's embedded, browser-decodable RGB preview.
+ *
+ * RAW files embed several JPEG streams: a tiny thumbnail, a full-size RGB preview, and the
+ * sensor mosaic itself encoded as lossless JPEG (SOF3, often 4-component / >8-bit and the
+ * LARGEST by bytes). Browsers cannot decode lossless JPEG, so we must NOT pick by byte size.
+ * Instead we inspect each stream's SOF marker and choose the largest-by-PIXELS stream that is
+ * baseline/extended/progressive (SOF0/1/2), 3-component, 8-bit — i.e. the real preview.
+ */
+export function extractRawPreview(bytes: Uint8Array): RawPreview | null {
   const starts: number[] = [];
   const ends: number[] = [];
   for (let i = 0; i + 1 < bytes.length; i++) {
@@ -95,25 +154,30 @@ export function extractRawPreview(bytes: Uint8Array): Blob | null {
   }
   if (!starts.length || !ends.length) return null;
 
-  let best = -1;
-  let bestEnd = -1;
-  let bestLen = 0;
-  for (const s of starts) {
+  let best: { start: number; end: number; w: number; h: number } | null = null;
+  for (const start of starts) {
     let end = -1;
     for (const e of ends) {
-      if (e > s) {
+      if (e > start) {
         end = e;
         break;
       }
     }
     if (end < 0) continue;
-    const len = end - s;
-    if (len > bestLen) {
-      bestLen = len;
-      best = s;
-      bestEnd = end;
-    }
+    const sof = readSof(bytes, start, end);
+    if (!sof) continue;
+    const decodable =
+      (sof.marker === 0xc0 || sof.marker === 0xc1 || sof.marker === 0xc2) &&
+      sof.components === 3 &&
+      sof.precision === 8;
+    if (!decodable) continue; // rejects the SOF3 lossless mosaic and odd-format streams
+    const area = sof.width * sof.height;
+    if (!best || area > best.w * best.h) best = { start, end, w: sof.width, h: sof.height };
   }
-  if (best < 0 || bestLen < 1024) return null; // ignore tiny/false matches
-  return new Blob([bytes.slice(best, bestEnd)], { type: 'image/jpeg' });
+  if (!best) return null;
+  return {
+    blob: new Blob([bytes.slice(best.start, best.end)], { type: 'image/jpeg' }),
+    width: best.w,
+    height: best.h,
+  };
 }

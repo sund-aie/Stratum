@@ -32,11 +32,11 @@ const G: Record<string, ToolGroup> = {
 
 /** Per-mode toolbox groups. Each inner array is a separated section. */
 export const TOOLBOX_GROUPS_BY_MODE: Record<WorkspaceMode, ToolGroup[][]> = {
-  // Pixel — the full raster set.
+  // Pixel — the full raster editing toolbox (mirrors a complete raster editor).
   pixel: [
     [G.move, G.marquee, G.lasso, G.wand, G.crop],
     [G.heal, G.brush, G.clone, G.history, G.eraser, G.gradient, G.focus, G.tone],
-    [G.type, G.shapes],
+    [G.pen, G.type, G.pathSel, G.shapes],
     [G.eyedropper, G.hand, G.zoom],
   ],
   // Vector — paths / shapes / type; no raster paint or retouch.
