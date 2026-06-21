@@ -168,6 +168,31 @@ body {
   border-bottom: 1px solid var(--ps-bevel-light);
 }
 
+/* ---- Workspace switch (Pixel | Vector | Photo) -------------------------- */
+.workspace-switch {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+}
+.ws-seg {
+  height: 16px;
+  min-width: 44px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ps-text);
+  background: var(--ps-chrome);
+  cursor: default;
+}
+.ws-seg.active {
+  background: var(--ps-tool-active-bg);
+  font-weight: bold;
+}
+
 /* ---- Options bar -------------------------------------------------------- */
 .options-bar {
   display: flex;
@@ -208,26 +233,57 @@ body {
 
 /* ---- Toolbox ------------------------------------------------------------ */
 .toolbox {
-  width: calc(var(--ps-tool-size) + 8px);
+  width: calc(var(--ps-tool-size) + 12px);
   background: var(--ps-chrome);
   border-right: 1px solid var(--ps-bevel-shadow);
   box-shadow: inset -1px 0 0 var(--ps-bevel-dark);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 3px 0;
+  align-items: stretch;
+  padding: 2px 0 0;
   flex: 0 0 auto;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden; /* footer pinned; only the tools region scrolls */
+  position: relative;
 }
 .toolbox.dbl {
-  width: calc(var(--ps-tool-size) * 2 + 10px);
+  width: calc(var(--ps-tool-size) * 2 + 16px);
+}
+.toolbox-coltoggle {
+  flex: 0 0 auto;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ps-text-dim);
+  border-bottom: 1px solid var(--ps-bevel-shadow);
+}
+.toolbox-coltoggle:hover {
+  color: var(--ps-text);
+}
+.toolbox-tools {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 3px 0;
 }
 .toolbox-grid {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  align-content: flex-start;
   width: 100%;
+}
+.toolbox-footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 0 8px;
+  background: var(--ps-chrome);
+  border-top: 1px solid var(--ps-bevel-shadow);
+  box-shadow: inset 0 1px 0 var(--ps-bevel-light);
 }
 .tool-btn {
   width: var(--ps-tool-size);
@@ -265,15 +321,14 @@ body {
   border-bottom: 4px solid var(--ps-text-dim);
 }
 .tool-sep {
-  width: 70%;
-  height: 1px;
-  margin: 3px 0;
-  background: var(--ps-bevel-shadow);
+  flex: 0 0 100%; /* full-width line that breaks the grid into sections */
+  height: 0;
+  margin: 4px 5px;
+  border-top: 1px solid var(--ps-bevel-shadow);
   border-bottom: 1px solid var(--ps-bevel-light);
 }
 .tool-flyout {
-  position: absolute;
-  left: calc(var(--ps-tool-size) + 8px);
+  position: fixed;
   background: var(--ps-chrome);
   padding: 2px;
   z-index: 200;
@@ -303,17 +358,19 @@ body {
   color: #dfe7f5;
 }
 
-/* ---- Color swatches / toolbox footer ------------------------------------ */
+/* ---- Color swatches (toolbox footer) ------------------------------------ */
+/* Padded box so the absolutely-positioned mini/swap glyphs can't bleed into
+   neighbouring controls. */
 .color-controls {
   position: relative;
-  width: 34px;
-  height: 34px;
-  margin: 6px 0 2px;
+  width: 36px;
+  height: 36px;
+  margin: 6px 8px 2px;
 }
 .swatch {
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   cursor: pointer;
 }
 .swatch.fg {
@@ -328,16 +385,16 @@ body {
 }
 .swatch-mini {
   position: absolute;
-  bottom: -2px;
-  left: -2px;
-  width: 11px;
-  height: 11px;
+  bottom: -3px;
+  left: -3px;
+  width: 12px;
+  height: 12px;
   cursor: pointer;
 }
 .swatch-swap {
   position: absolute;
-  top: -3px;
-  right: -2px;
+  top: -4px;
+  right: -3px;
   width: 12px;
   height: 12px;
   cursor: pointer;
@@ -345,8 +402,8 @@ body {
 }
 .toolbox-toggles {
   display: flex;
-  gap: 2px;
-  margin-top: 4px;
+  gap: 3px;
+  margin-top: 6px;
 }
 .mini-btn {
   width: 18px;

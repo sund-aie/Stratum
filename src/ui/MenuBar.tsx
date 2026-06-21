@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useStore, useDispatch, getStore } from '../core/state/store';
+import { useStore, useDispatch, getStore, WorkspaceMode } from '../core/state/store';
 import { useApp } from './AppContext';
 import { Icon } from './icons';
+
+const WORKSPACE_MODES: { id: WorkspaceMode; label: string }[] = [
+  { id: 'pixel', label: 'Pixel' },
+  { id: 'vector', label: 'Vector' },
+  { id: 'photo', label: 'Photo' },
+];
 
 interface MenuRow {
   label: string;
@@ -150,6 +156,18 @@ export const MenuBar: React.FC = () => {
           )}
         </div>
       ))}
+
+      <div className="workspace-switch" title="Workspace">
+        {WORKSPACE_MODES.map((m) => (
+          <div
+            key={m.id}
+            className={`ws-seg ${state.workspaceMode === m.id ? 'bevel-in active' : 'bevel-out'}`}
+            onMouseDown={() => dispatch({ type: 'SET_WORKSPACE_MODE', payload: m.id })}
+          >
+            {m.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

@@ -383,6 +383,12 @@ export const glyphs: Record<string, G> = {
   check: stroke(<path d="M3 8.5l3 3 7-7.5" strokeWidth="1.6" />),
   close: stroke(<path d="M4 4l8 8M12 4l-8 8" strokeWidth="1.4" />),
   collapse: stroke(<path d="M3 6l5 5 5-5" strokeWidth="1.5" />),
+  colToggle: stroke(
+    <>
+      <path d="M4 4l3 4-3 4" strokeWidth="1.4" />
+      <path d="M8.5 4l3 4-3 4" strokeWidth="1.4" />
+    </>
+  ),
 };
 
 // Pen reused for the vector layer-type icon.

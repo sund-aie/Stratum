@@ -24,6 +24,9 @@ import type {
 
 export type ThemeName = 'cs2' | 'modern';
 
+/** Workspace focus: Pixel (raster), Vector (paths/shapes), Photo (non-destructive develop). */
+export type WorkspaceMode = 'pixel' | 'vector' | 'photo';
+
 export interface AppState {
   document: Document | null;
   activeTool: string;
@@ -40,6 +43,7 @@ export interface AppState {
   toolOptions: Record<string, Record<string, unknown>>;
   quickMask: boolean;
   theme: ThemeName;
+  workspaceMode: WorkspaceMode;
   /** Names of undo entries for the History panel; index 0 = oldest. */
   historyEntries: string[];
   /** Pointer into historyEntries; equals historyEntries.length when at the live tip. */
@@ -110,6 +114,7 @@ export function createDefaultState(): AppState {
     toolOptions: {},
     quickMask: false,
     theme: 'cs2',
+    workspaceMode: 'pixel',
     historyEntries: [],
     historyPointer: 0,
   };
@@ -135,6 +140,8 @@ export type Action =
   | { type: 'REMOVE_GUIDE'; payload: string }
   | { type: 'UPDATE_GUIDE'; payload: { id: string; changes: Partial<Guide> } }
   | { type: 'TOGGLE_PANEL'; payload: keyof PanelState }
+  | { type: 'SET_PANELS'; payload: Partial<PanelState> }
+  | { type: 'SET_WORKSPACE_MODE'; payload: WorkspaceMode }
   | { type: 'UPDATE_PREFERENCES'; payload: Partial<Preferences> }
   | { type: 'SET_FOREGROUND'; payload: RGBAColor }
   | { type: 'SET_BACKGROUND'; payload: RGBAColor }
@@ -412,6 +419,13 @@ export class Store {
           ...state,
           panels: { ...state.panels, [action.payload]: !state.panels[action.payload] },
         };
+
+      case 'SET_PANELS':
+        return { ...state, panels: { ...state.panels, ...action.payload } };
+
+      case 'SET_WORKSPACE_MODE':
+        // A workspace change keeps the current document — it's a view change, not a new file.
+        return { ...state, workspaceMode: action.payload };
 
       case 'UPDATE_PREFERENCES':
         return { ...state, preferences: { ...state.preferences, ...action.payload } };
