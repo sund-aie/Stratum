@@ -1,6 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { RGBAColor } from '../types';
+import type { WorkspaceMode } from '../core/state/store';
 import { rgbToHex, hexToRgb, rgbToHsv, hsvToRgb, rgbaToCss } from '../core/color/color';
+
+export interface NewDocResult {
+  width: number;
+  height: number;
+  background: 'white' | 'transparent' | RGBAColor;
+  mode: WorkspaceMode;
+  resolution: number;
+}
 
 export const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }> = ({
   title,
@@ -18,46 +27,161 @@ export const Modal: React.FC<{ title: string; onClose: () => void; children: Rea
 );
 
 // ---------------------------------------------------------------------------
-export const NewDocumentDialog: React.FC<{ onCancel: () => void; onCreate: (w: number, h: number, bg: 'white' | 'transparent') => void }> = ({
-  onCancel,
-  onCreate,
-}) => {
-  const [w, setW] = useState(800);
-  const [h, setH] = useState(600);
-  const [bg, setBg] = useState<'white' | 'transparent'>('white');
-  const presets: [string, number, number][] = [
-    ['Default (800×600)', 800, 600],
-    ['HD 1080p', 1920, 1080],
-    ['Square 1000', 1000, 1000],
-    ['A4 @96dpi', 794, 1123],
-  ];
+const WS_MODES: { id: WorkspaceMode; label: string }[] = [
+  { id: 'pixel', label: 'Pixel' },
+  { id: 'vector', label: 'Vector' },
+  { id: 'photo', label: 'Photo' },
+];
+
+interface PresetItem { label: string; w: number; h: number; res: number }
+const PRESET_GROUPS: { group: string; items: PresetItem[] }[] = [
+  {
+    group: 'Pixel / Photo',
+    items: [
+      { label: '1920 × 1080', w: 1920, h: 1080, res: 72 },
+      { label: '1280 × 720', w: 1280, h: 720, res: 72 },
+      { label: '1080 × 1080', w: 1080, h: 1080, res: 72 },
+      { label: '2560 × 1440', w: 2560, h: 1440, res: 72 },
+      { label: 'A4 @300ppi (2480 × 3508)', w: 2480, h: 3508, res: 300 },
+      { label: 'Letter @300ppi (2550 × 3300)', w: 2550, h: 3300, res: 300 },
+    ],
+  },
+  {
+    group: 'Vector',
+    items: [
+      { label: 'A4 (2480 × 3508)', w: 2480, h: 3508, res: 300 },
+      { label: 'Letter (2550 × 3300)', w: 2550, h: 3300, res: 300 },
+      { label: '1080 × 1080', w: 1080, h: 1080, res: 72 },
+      { label: '1366 × 768', w: 1366, h: 768, res: 72 },
+      { label: '1920 × 1080', w: 1920, h: 1080, res: 72 },
+    ],
+  },
+];
+const PRESET_FLAT = PRESET_GROUPS.flatMap((g) => g.items);
+
+export const NewDocumentDialog: React.FC<{
+  initialMode: WorkspaceMode;
+  onCancel: () => void;
+  onCreate: (r: NewDocResult) => void;
+  onOpen: () => void;
+}> = ({ initialMode, onCancel, onCreate, onOpen }) => {
+  const [mode, setMode] = useState<WorkspaceMode>(initialMode);
+  const [unit, setUnit] = useState<'px' | 'in' | 'cm'>('px');
+  const [res, setRes] = useState(72);
+  const [w, setW] = useState(1920);
+  const [h, setH] = useState(1080);
+  const [bgKind, setBgKind] = useState<'white' | 'transparent' | 'color'>('white');
+  const [bgColor, setBgColor] = useState('#ffffff');
+
+  const applyPreset = (label: string) => {
+    const p = PRESET_FLAT.find((it) => it.label === label && it.w);
+    if (!p) return;
+    setUnit('px');
+    setRes(p.res);
+    setW(p.w);
+    setH(p.h);
+  };
+
+  const toPx = (v: number): number =>
+    unit === 'px' ? Math.round(v) : unit === 'in' ? Math.round(v * res) : Math.round((v / 2.54) * res);
+
+  const create = () => {
+    const background =
+      bgKind === 'color' ? hexToRgb(bgColor) ?? { r: 255, g: 255, b: 255, a: 1 } : bgKind;
+    onCreate({
+      width: Math.max(1, toPx(w)),
+      height: Math.max(1, toPx(h)),
+      background,
+      mode,
+      resolution: res,
+    });
+  };
+
   return (
     <Modal
       title="New Document"
       onClose={onCancel}
       footer={
         <>
+          <div className="ps-btn" style={{ marginRight: 'auto' }} onClick={onOpen}>
+            Open…
+          </div>
           <div className="ps-btn" onClick={onCancel}>Cancel</div>
-          <div className="ps-btn" onClick={() => onCreate(w, h, bg)}>OK</div>
+          <div className="ps-btn" onClick={create}>OK</div>
         </>
       }
     >
-      <div className="row"><span className="label" style={{ width: 70 }}>Preset</span>
-        <select className="ps-select" onChange={(e) => { const p = presets[+e.target.value]; setW(p[1]); setH(p[2]); }}>
-          {presets.map((p, i) => <option key={i} value={i}>{p[0]}</option>)}
+      <div className="row">
+        <span className="label" style={{ width: 80 }}>Workspace</span>
+        <div className="btn-group">
+          {WS_MODES.map((m) => (
+            <div
+              key={m.id}
+              className={`seg${mode === m.id ? ' active' : ''}`}
+              style={{ width: 56 }}
+              onClick={() => setMode(m.id)}
+            >
+              {m.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="row">
+        <span className="label" style={{ width: 80 }}>Preset</span>
+        <select className="ps-select" style={{ flex: 1 }} onChange={(e) => applyPreset(e.target.value)} defaultValue="">
+          <option value="" disabled>
+            Choose a preset…
+          </option>
+          {PRESET_GROUPS.map((g) => (
+            <optgroup key={g.group} label={g.group}>
+              {g.items.map((it, i) => (
+                <option key={`${g.group}-${i}`} value={it.label}>
+                  {it.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
         </select>
       </div>
-      <div className="row"><span className="label" style={{ width: 70 }}>Width</span>
-        <input type="number" className="ps-input" style={{ width: 90 }} value={w} onChange={(e) => setW(Math.max(1, +e.target.value))} /><span className="label">px</span>
+
+      <div className="row">
+        <span className="label" style={{ width: 80 }}>Width</span>
+        <input type="number" className="ps-input" style={{ width: 90 }} value={w} onChange={(e) => setW(Math.max(0, +e.target.value))} />
+        <span className="label" style={{ width: 80 }}>Height</span>
+        <input type="number" className="ps-input" style={{ width: 90 }} value={h} onChange={(e) => setH(Math.max(0, +e.target.value))} />
       </div>
-      <div className="row"><span className="label" style={{ width: 70 }}>Height</span>
-        <input type="number" className="ps-input" style={{ width: 90 }} value={h} onChange={(e) => setH(Math.max(1, +e.target.value))} /><span className="label">px</span>
+
+      <div className="row">
+        <span className="label" style={{ width: 80 }}>Units</span>
+        <select className="ps-select" value={unit} onChange={(e) => setUnit(e.target.value as any)}>
+          <option value="px">Pixels</option>
+          <option value="in">Inches</option>
+          <option value="cm">Centimeters</option>
+        </select>
+        <span className="label" style={{ marginLeft: 12 }}>Resolution</span>
+        <input type="number" className="ps-input" style={{ width: 56 }} value={res} onChange={(e) => setRes(Math.max(1, +e.target.value))} />
+        <span className="label">ppi</span>
       </div>
-      <div className="row"><span className="label" style={{ width: 70 }}>Background</span>
-        <select className="ps-select" value={bg} onChange={(e) => setBg(e.target.value as any)}>
+
+      <div className="row">
+        <span className="label" style={{ width: 80 }}>Background</span>
+        <select className="ps-select" value={bgKind} onChange={(e) => setBgKind(e.target.value as any)}>
           <option value="white">White</option>
           <option value="transparent">Transparent</option>
+          <option value="color">Color…</option>
         </select>
+        {bgKind === 'color' && (
+          <label className="bevel-out" style={{ width: 24, height: 18, background: bgColor, cursor: 'pointer' }}>
+            <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} style={{ opacity: 0, width: 0, height: 0 }} />
+          </label>
+        )}
+      </div>
+
+      <div className="dim" style={{ fontSize: 10 }}>
+        {unit === 'px'
+          ? `${Math.max(1, toPx(w))} × ${Math.max(1, toPx(h))} px`
+          : `= ${Math.max(1, toPx(w))} × ${Math.max(1, toPx(h))} px @ ${res} ppi`}
       </div>
     </Modal>
   );

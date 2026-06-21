@@ -55,6 +55,23 @@ describe('gesture-granular history', () => {
     expect(store.getState().selection).toEqual(sel);
   });
 
+  it('SET_WORKSPACE_MODE switches mode but keeps the document', () => {
+    store.dispatch({ type: 'SET_DOCUMENT', payload: tinyDoc() });
+    const docBefore = store.getState().document;
+    expect(store.getState().workspaceMode).toBe('pixel');
+    store.dispatch({ type: 'SET_WORKSPACE_MODE', payload: 'vector' });
+    expect(store.getState().workspaceMode).toBe('vector');
+    expect(store.getState().document).toBe(docBefore); // same document, just a view change
+    store.dispatch({ type: 'SET_WORKSPACE_MODE', payload: 'photo' });
+    expect(store.getState().workspaceMode).toBe('photo');
+  });
+
+  it('SET_PANELS merges a partial panel state', () => {
+    store.dispatch({ type: 'SET_PANELS', payload: { historyOpen: true } });
+    expect(store.getState().panels.historyOpen).toBe(true);
+    expect(store.getState().panels.layersOpen).toBe(true); // untouched
+  });
+
   it('mid-gesture preview moves do not create extra steps', () => {
     store.dispatch({ type: 'SET_DOCUMENT', payload: tinyDoc() });
     store.beginHistory('Stroke');

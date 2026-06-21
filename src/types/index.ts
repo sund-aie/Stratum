@@ -397,6 +397,8 @@ export interface DocumentMetadata {
   version: string;
   colorProfile: string;
   bitsPerChannel: 8 | 16 | 32;
+  /** Resolution in pixels-per-inch; px is the canvas's internal unit. */
+  resolution?: number;
 }
 
 // ============================================================================

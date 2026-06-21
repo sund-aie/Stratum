@@ -111,7 +111,8 @@ export function newDocument(
   name: string,
   width: number,
   height: number,
-  background: 'white' | 'transparent' | RGBAColor
+  background: 'white' | 'transparent' | RGBAColor,
+  resolution = 72
 ): Document {
   const layers: Layer[] = [];
   let bgColor: RGBAColor | undefined;
@@ -136,6 +137,7 @@ export function newDocument(
       version: '1.0.0',
       colorProfile: 'sRGB',
       bitsPerChannel: 8,
+      resolution,
     },
   } as Document;
 }

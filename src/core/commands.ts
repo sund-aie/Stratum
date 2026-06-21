@@ -3,7 +3,7 @@
  * Every command goes through the gesture-granular history so undo/redo stays correct.
  */
 import type { Document, Layer, RasterLayer, SelectionData, RGBAColor, AdjustmentLayer } from '../types';
-import { getStore } from './state/store';
+import { getStore, WorkspaceMode } from './state/store';
 import { CanvasEngine } from './engine/CanvasEngine';
 import { InteractionController } from './interaction/InteractionController';
 import {
@@ -26,6 +26,15 @@ export interface CommandUI {
   openColorPicker: (which: 'fg' | 'bg') => void;
   openCanvasSizeDialog: () => void;
   toast: (msg: string) => void;
+}
+
+export interface NewDocOptions {
+  width?: number; // px (internal unit)
+  height?: number; // px
+  background?: 'white' | 'transparent' | RGBAColor;
+  name?: string;
+  resolution?: number; // ppi (metadata)
+  mode?: WorkspaceMode;
 }
 
 export interface CommandCtx {
@@ -56,10 +65,16 @@ export function createCommands(ctx: CommandCtx) {
   return {
     ui,
     // ---- File ----
-    newDocument(width = 800, height = 600, bg: 'white' | 'transparent' | RGBAColor = 'white', name = 'Untitled') {
-      const d = ioNewDocument(name, width, height, bg);
+    newDocument(opts: NewDocOptions = {}) {
+      const width = opts.width ?? 800;
+      const height = opts.height ?? 600;
+      const bg = opts.background ?? 'white';
+      const name = opts.name ?? 'Untitled-1';
+      const resolution = opts.resolution ?? 72;
+      const d = ioNewDocument(name, width, height, bg, resolution);
       d.activeArtboardId = d.artboards[0].id;
       setDoc(d);
+      if (opts.mode) store.dispatch({ type: 'SET_WORKSPACE_MODE', payload: opts.mode });
       this.fitToScreen();
     },
     async openImage() {
@@ -68,6 +83,7 @@ export function createCommands(ctx: CommandCtx) {
       const data = await fileToImageData(files[0]);
       const name = files[0].name.replace(/\.[^.]+$/, '');
       setDoc(documentFromImageData(data, name));
+      store.dispatch({ type: 'SET_WORKSPACE_MODE', payload: 'pixel' });
       this.fitToScreen();
     },
     async placeImage() {

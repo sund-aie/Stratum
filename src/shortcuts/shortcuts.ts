@@ -83,7 +83,7 @@ export function installShortcuts(commands: Commands, controller: InteractionCont
       switch (lower) {
         case 'n':
           e.preventDefault();
-          e.shiftKey ? commands.addRasterLayer() : commands.newDocument();
+          e.shiftKey ? commands.addRasterLayer() : commands.ui.openNewDialog();
           return;
         case 'o':
           e.preventDefault();

@@ -6,7 +6,6 @@ import { InteractionController } from './core/interaction/InteractionController'
 import { createCommands, Commands, CommandUI } from './core/commands';
 import { installShortcuts } from './shortcuts/shortcuts';
 import { getToolRegistry } from './core/tools/ToolRegistry';
-import { newDocument } from './core/io/imageIO';
 import { exportDocument } from './core/io/exporter';
 import { AppProvider } from './ui/AppContext';
 import { MenuBar } from './ui/MenuBar';
@@ -104,23 +103,19 @@ function App() {
     });
     ro.observe(docAreaRef.current);
 
-    // register tools + default document
+    // register tools — but do NOT auto-create a document; launch into the New dialog.
     const registry = getToolRegistry();
     dispatch({ type: 'REGISTER_TOOLS', payload: registry.getAllTools() });
     dispatch({ type: 'SET_ACTIVE_TOOL', payload: 'brush' });
 
-    const doc = newDocument('Untitled-1', 800, 600, 'white');
-    doc.activeArtboardId = doc.artboards[0].id;
-    dispatch({ type: 'SET_DOCUMENT', payload: doc });
-
     setReady(true);
-    // fit after layout settles
+    setDialog({ type: 'new' });
+    // size the canvas to the empty gray desktop after layout settles
     window.setTimeout(() => {
       const area = docAreaRef.current;
       if (!area) return;
       const rect = area.getBoundingClientRect();
       engine.resize(rect.width, rect.height);
-      commands.fitToScreen();
       controller.renderNow();
     }, 30);
 
@@ -137,6 +132,15 @@ function App() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ---- per-mode panel defaults (applied when the workspace mode changes) ----
+  const mode = state.workspaceMode;
+  useEffect(() => {
+    // Photo surfaces Develop; Vector surfaces Paths; Pixel keeps the standard set.
+    // (active tab is handled by keying the palette groups on `mode` in the dock below)
+    dispatch({ type: 'SET_PANELS', payload: { layersOpen: true, propertiesOpen: true } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   // ---- drag & drop image ----
   const onDrop = (e: React.DragEvent) => {
@@ -191,6 +195,33 @@ function App() {
             onDrop={onDrop}
           >
             <canvas ref={canvasRef} />
+            {ready && !state.document && commands && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: dialog ? 'none' : 'auto',
+                }}
+              >
+                <div className="dialog" style={{ padding: 0 }}>
+                  <div className="dialog-title">Stratum — Unified Canvas</div>
+                  <div className="dialog-body" style={{ alignItems: 'center', gap: 10 }}>
+                    <div className="dim">No document open</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div className="ps-btn" onClick={() => setDialog({ type: 'new' })}>
+                        Create a new document…
+                      </div>
+                      <div className="ps-btn" onClick={() => commands.openImage()}>
+                        Open…
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {toast && (
               <div
                 style={{
@@ -227,6 +258,8 @@ function App() {
               />
               {state.panels.propertiesOpen && (
                 <PaletteGroup
+                  key={`props-${mode}`}
+                  initial={mode === 'photo' ? 'develop' : 'props'}
                   tabs={[
                     { id: 'props', label: 'Properties', render: () => <PropertiesPanel /> },
                     { id: 'develop', label: 'Develop', render: () => <PropertiesPanel /> },
@@ -238,6 +271,8 @@ function App() {
               )}
               {state.panels.layersOpen && (
                 <PaletteGroup
+                  key={`layers-${mode}`}
+                  initial={mode === 'vector' ? 'paths' : 'layers'}
                   tabs={[
                     { id: 'layers', label: 'Layers', render: () => <LayersPanel /> },
                     { id: 'channels', label: 'Channels', render: () => <div className="dim" style={{ padding: 6 }}>Channels view not yet available.</div> },
@@ -253,10 +288,21 @@ function App() {
       {/* Dialogs */}
       {dialog?.type === 'new' && commands && (
         <NewDocumentDialog
+          initialMode={state.workspaceMode}
           onCancel={() => setDialog(null)}
-          onCreate={(w, h, bg) => {
-            commands.newDocument(w, h, bg);
+          onCreate={(r) => {
+            commands.newDocument({
+              width: r.width,
+              height: r.height,
+              background: r.background,
+              mode: r.mode,
+              resolution: r.resolution,
+            });
             setDialog(null);
+          }}
+          onOpen={() => {
+            setDialog(null);
+            commands.openImage();
           }}
         />
       )}
