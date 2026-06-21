@@ -96,7 +96,9 @@ function App() {
 
     // size + render on container resize
     const ro = new ResizeObserver(() => {
-      const rect = docAreaRef.current!.getBoundingClientRect();
+      const area = docAreaRef.current;
+      if (!area) return;
+      const rect = area.getBoundingClientRect();
       engine.resize(rect.width, rect.height);
       controller.renderNow();
     });
@@ -114,7 +116,9 @@ function App() {
     setReady(true);
     // fit after layout settles
     window.setTimeout(() => {
-      const rect = docAreaRef.current!.getBoundingClientRect();
+      const area = docAreaRef.current;
+      if (!area) return;
+      const rect = area.getBoundingClientRect();
       engine.resize(rect.width, rect.height);
       commands.fitToScreen();
       controller.renderNow();
@@ -147,81 +151,104 @@ function App() {
 
   const commands = commandsRef.current;
 
+  // The context value only exists once the singletons are built (after the init effect).
+  // The canvas/doc-area below render UNCONDITIONALLY so the effect can find their refs on
+  // the first commit; only the useApp()-consuming chrome is gated on `ctx`.
+  const ctx =
+    ready && commandsRef.current && controllerRef.current && engineRef.current
+      ? { commands: commandsRef.current, controller: controllerRef.current, engine: engineRef.current }
+      : null;
+
   return (
     <div className="app-shell">
       <div className="titlebar">
-        <span className="app-name">Adobe Photoshop</span>
-        <span className="doc-name">— {state.document?.name ?? 'Untitled'} {ready ? `@ ${Math.round(state.viewport.zoom * 100)}%` : ''}</span>
-        <span style={{ marginLeft: 'auto', opacity: 0.7, fontSize: 10 }}>Stratum · Unified Canvas</span>
+        <span className="app-name">Stratum</span>
+        <span className="doc-name">
+          Unified Canvas — {state.document?.name ?? 'Untitled'}{' '}
+          {ready ? `@ ${Math.round(state.viewport.zoom * 100)}%` : ''}
+        </span>
       </div>
 
-      {commands && (
-        <AppProvider value={{ commands, controller: controllerRef.current!, engine: engineRef.current! }}>
+      {ctx && (
+        <AppProvider value={ctx}>
           <MenuBar />
           <OptionsBar />
-          <div className="app-body">
-            <Toolbox />
-            <div className="app-center">
-              <div
-                className="doc-area"
-                ref={docAreaRef}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={onDrop}
-              >
-                <canvas ref={canvasRef} />
-                {toast && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: 12,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: 'rgba(0,0,0,0.8)',
-                      color: '#fff',
-                      padding: '6px 12px',
-                      fontSize: 11,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {toast}
-                  </div>
-                )}
-              </div>
-              <StatusBar status={status} />
-            </div>
-            {state.panels.layersOpen || state.panels.historyOpen || state.panels.propertiesOpen ? (
-              <div className="dock">
-                <PaletteGroup
-                  tabs={[
-                    { id: 'nav', label: 'Navigator', render: () => <NavigatorPanel /> },
-                    { id: 'color', label: 'Color', render: () => <ColorPanel /> },
-                  ]}
-                />
-                {state.panels.propertiesOpen && (
-                  <PaletteGroup
-                    tabs={[
-                      { id: 'props', label: 'Properties', render: () => <PropertiesPanel /> },
-                      { id: 'develop', label: 'Develop', render: () => <PropertiesPanel /> },
-                    ]}
-                  />
-                )}
-                {state.panels.historyOpen && (
-                  <PaletteGroup tabs={[{ id: 'history', label: 'History', render: () => <HistoryPanel /> }]} />
-                )}
-                {state.panels.layersOpen && (
-                  <PaletteGroup
-                    tabs={[
-                      { id: 'layers', label: 'Layers', render: () => <LayersPanel /> },
-                      { id: 'channels', label: 'Channels', render: () => <div className="dim" style={{ padding: 6 }}>Channels view not yet available.</div> },
-                      { id: 'paths', label: 'Paths', render: () => <div className="dim" style={{ padding: 6 }}>Paths view not yet available.</div> },
-                    ]}
-                  />
-                )}
-              </div>
-            ) : null}
-          </div>
         </AppProvider>
       )}
+
+      <div className="app-body">
+        {ctx && (
+          <AppProvider value={ctx}>
+            <Toolbox />
+          </AppProvider>
+        )}
+
+        <div className="app-center">
+          <div
+            className="doc-area"
+            ref={docAreaRef}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+          >
+            <canvas ref={canvasRef} />
+            {toast && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 12,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0,0,0,0.8)',
+                  color: '#fff',
+                  padding: '6px 12px',
+                  fontSize: 11,
+                  pointerEvents: 'none',
+                }}
+              >
+                {toast}
+              </div>
+            )}
+          </div>
+          {ctx && (
+            <AppProvider value={ctx}>
+              <StatusBar status={status} />
+            </AppProvider>
+          )}
+        </div>
+
+        {ctx && (state.panels.layersOpen || state.panels.historyOpen || state.panels.propertiesOpen) && (
+          <AppProvider value={ctx}>
+            <div className="dock">
+              <PaletteGroup
+                tabs={[
+                  { id: 'nav', label: 'Navigator', render: () => <NavigatorPanel /> },
+                  { id: 'color', label: 'Color', render: () => <ColorPanel /> },
+                ]}
+              />
+              {state.panels.propertiesOpen && (
+                <PaletteGroup
+                  tabs={[
+                    { id: 'props', label: 'Properties', render: () => <PropertiesPanel /> },
+                    { id: 'develop', label: 'Develop', render: () => <PropertiesPanel /> },
+                  ]}
+                />
+              )}
+              {state.panels.historyOpen && (
+                <PaletteGroup tabs={[{ id: 'history', label: 'History', render: () => <HistoryPanel /> }]} />
+              )}
+              {state.panels.layersOpen && (
+                <PaletteGroup
+                  tabs={[
+                    { id: 'layers', label: 'Layers', render: () => <LayersPanel /> },
+                    { id: 'channels', label: 'Channels', render: () => <div className="dim" style={{ padding: 6 }}>Channels view not yet available.</div> },
+                    { id: 'paths', label: 'Paths', render: () => <div className="dim" style={{ padding: 6 }}>Paths view not yet available.</div> },
+                  ]}
+                />
+              )}
+            </div>
+          </AppProvider>
+        )}
+      </div>
 
       {/* Dialogs */}
       {dialog?.type === 'new' && commands && (

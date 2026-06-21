@@ -1,5 +1,5 @@
 /**
- * Stratum icon set — monochrome SVG recreations of the Photoshop CS2 toolbox glyphs
+ * Stratum icon set — monochrome SVG recreations of the classic 2006-era toolbox glyphs
  * and panel/menu icons (PD-3). No emoji or color icon packs anywhere in the UI.
  *
  * All glyphs are drawn in a 16x16 box and inherit `currentColor`, so the theme controls

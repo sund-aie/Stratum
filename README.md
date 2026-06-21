@@ -1,8 +1,8 @@
 # Stratum — Unified Canvas
 
-A browser image / vector / photo editor (React 18 + TypeScript + Vite) fusing Photoshop
-(raster), Illustrator (vector), and Lightroom (develop) concepts, presented in a faithful
-**Adobe Photoshop CS2 (2006) "Adobe gray"** interface.
+A browser image / vector / photo editor (React 18 + TypeScript + Vite) fusing raster,
+vector, and photo-develop concepts, presented in a faithful **classic 2006 "gray"
+(CS2-style)** interface.
 
 This codebase was resurrected from a non-functional shell: the engine, tools, and state
 machinery existed but were disconnected. It now has a real interaction + render spine, real

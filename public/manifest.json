@@ -1,7 +1,7 @@
 {
-  "name": "Unified Canvas",
-  "short_name": "Unified Canvas",
-  "description": "A unified Photoshop, Illustrator, Lightroom alternative",
+  "name": "Stratum — Unified Canvas",
+  "short_name": "Stratum",
+  "description": "A browser-based raster, vector, and photo editor",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e1e1e",
