@@ -44,6 +44,8 @@ export interface AppState {
   quickMask: boolean;
   theme: ThemeName;
   workspaceMode: WorkspaceMode;
+  /** Monotonic counter bumped on any document-content mutation; drives the composite cache. */
+  revision: number;
   /** Names of undo entries for the History panel; index 0 = oldest. */
   historyEntries: string[];
   /** Pointer into historyEntries; equals historyEntries.length when at the live tip. */
@@ -115,10 +117,21 @@ export function createDefaultState(): AppState {
     quickMask: false,
     theme: 'cs2',
     workspaceMode: 'pixel',
+    revision: 0,
     historyEntries: [],
     historyPointer: 0,
   };
 }
+
+/** Actions that change document content and therefore must bump the composite revision. */
+const CONTENT_ACTIONS = new Set<Action['type']>([
+  'SET_DOCUMENT',
+  'UPDATE_DOCUMENT',
+  'ADD_LAYER',
+  'REMOVE_LAYER',
+  'UPDATE_LAYER',
+  'REORDER_LAYERS',
+]);
 
 // ============================================================================
 // ACTION TYPES
@@ -228,7 +241,9 @@ export class Store {
   dispatch = (action: Action): void => {
     const newState = this.reduce(this.state, action);
     if (newState !== this.state) {
-      this.state = newState;
+      this.state = CONTENT_ACTIONS.has(action.type)
+        ? { ...newState, revision: newState.revision + 1 }
+        : newState;
       this.notifySubscribers();
     }
   };
@@ -284,7 +299,7 @@ export class Store {
     if (this.undoStack.length === 0 || !this.state.document) return;
     const entry = this.undoStack.pop()!;
     this.redoStack.push({ name: entry.name, doc: cloneDocument(this.state.document), selection: this.state.selection });
-    this.state = { ...this.state, document: entry.doc, selection: entry.selection };
+    this.state = { ...this.state, document: entry.doc, selection: entry.selection, revision: this.state.revision + 1 };
     this.syncHistoryMeta();
     this.notifySubscribers();
   }
@@ -293,7 +308,7 @@ export class Store {
     if (this.redoStack.length === 0 || !this.state.document) return;
     const entry = this.redoStack.pop()!;
     this.undoStack.push({ name: entry.name, doc: cloneDocument(this.state.document), selection: this.state.selection });
-    this.state = { ...this.state, document: entry.doc, selection: entry.selection };
+    this.state = { ...this.state, document: entry.doc, selection: entry.selection, revision: this.state.revision + 1 };
     this.syncHistoryMeta();
     this.notifySubscribers();
   }

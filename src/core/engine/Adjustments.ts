@@ -5,6 +5,13 @@
 
 import type { AdjustmentType, AdjustmentSettings, HSLAdjustments } from '../../types';
 import { RasterOps } from './RasterOps';
+import {
+  SRGB_TO_LINEAR,
+  linearToSrgb8,
+  linearLuminance,
+  srgbLuminance,
+  smoothstep,
+} from './ColorMath';
 
 export class Adjustments {
   /**
@@ -85,145 +92,133 @@ export class Adjustments {
     return RasterOps.applySaturation(imageData, saturation);
   }
 
-  private static applyHighlights(imageData: ImageData, amount: number): ImageData {
+  /**
+   * Smooth, hue-preserving tonal-region adjustment in linear light. Computes a per-pixel
+   * region weight from luminance, lifts/lowers the target luminance, then scales RGB by the
+   * luminance ratio (uniform scale preserves hue/saturation — no color shift, no hard banding).
+   */
+  private static applyLuminanceRegion(
+    imageData: ImageData,
+    amount: number,
+    weight: (Y: number) => number,
+    k = 0.5
+  ): ImageData {
+    if (!amount) return imageData;
     const data = imageData.data;
-    const factor = 1 + amount / 100;
-
+    const a = amount / 100;
     for (let i = 0; i < data.length; i += 4) {
-      const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      
-      if (luminance > 128) {
-        const highlightFactor = (luminance - 128) / 127;
-        const adjustedFactor = factor * highlightFactor;
-        
-        data[i] = Math.min(255, Math.max(0, data[i] * (1 + adjustedFactor)));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * (1 + adjustedFactor)));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * (1 + adjustedFactor)));
-      }
+      const r = SRGB_TO_LINEAR[data[i]];
+      const g = SRGB_TO_LINEAR[data[i + 1]];
+      const b = SRGB_TO_LINEAR[data[i + 2]];
+      const Y = linearLuminance(r, g, b);
+      const w = weight(Y);
+      if (w <= 0) continue;
+      let Ynew = Y + a * k * w;
+      Ynew = Ynew < 0 ? 0 : Ynew > 1 ? 1 : Ynew;
+      const s = Y > 1e-6 ? Ynew / Y : 1;
+      data[i] = linearToSrgb8(r * s);
+      data[i + 1] = linearToSrgb8(g * s);
+      data[i + 2] = linearToSrgb8(b * s);
     }
-
     return imageData;
+  }
+
+  private static applyHighlights(imageData: ImageData, amount: number): ImageData {
+    return this.applyLuminanceRegion(imageData, amount, (Y) => Y * Y);
   }
 
   private static applyShadows(imageData: ImageData, amount: number): ImageData {
-    const data = imageData.data;
-    const factor = 1 + amount / 100;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const luminance = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      
-      if (luminance < 128) {
-        const shadowFactor = (128 - luminance) / 128;
-        const adjustedFactor = factor * shadowFactor;
-        
-        data[i] = Math.min(255, Math.max(0, data[i] * (1 + adjustedFactor)));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * (1 + adjustedFactor)));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * (1 + adjustedFactor)));
-      }
-    }
-
-    return imageData;
+    return this.applyLuminanceRegion(imageData, amount, (Y) => (1 - Y) * (1 - Y));
   }
 
   private static applyWhites(imageData: ImageData, amount: number): ImageData {
-    const data = imageData.data;
-    const factor = amount / 100;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const maxChannel = Math.max(data[i], data[i + 1], data[i + 2]);
-      
-      if (maxChannel > 200) {
-        const whiteFactor = (maxChannel - 200) / 55 * factor;
-        data[i] = Math.min(255, Math.max(0, data[i] + whiteFactor * 255));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + whiteFactor * 255));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + whiteFactor * 255));
-      }
-    }
-
-    return imageData;
+    return this.applyLuminanceRegion(imageData, amount, (Y) => smoothstep(0.6, 1.0, Y));
   }
 
   private static applyBlacks(imageData: ImageData, amount: number): ImageData {
-    const data = imageData.data;
-    const factor = amount / 100;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const minChannel = Math.min(data[i], data[i + 1], data[i + 2]);
-      
-      if (minChannel < 55) {
-        const blackFactor = (55 - minChannel) / 55 * factor;
-        data[i] = Math.min(255, Math.max(0, data[i] - blackFactor * 55));
-        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] - blackFactor * 55));
-        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] - blackFactor * 55));
-      }
-    }
-
-    return imageData;
+    return this.applyLuminanceRegion(imageData, amount, (Y) => smoothstep(0.4, 0.0, Y));
   }
 
   private static applyVibrance(imageData: ImageData, amount: number): ImageData {
+    if (!amount) return imageData;
     const data = imageData.data;
-    const factor = amount / 100;
-
+    const f = amount / 100;
     for (let i = 0; i < data.length; i += 4) {
-      const maxChannel = Math.max(data[i], data[i + 1], data[i + 2]);
-      const minChannel = Math.min(data[i], data[i + 1], data[i + 2]);
-      const saturation = maxChannel - minChannel;
-      
-      // Less saturated colors get more boost
-      const vibranceFactor = factor * (1 - saturation / 255);
-      
-      const gray = 0.2989 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      data[i] = Math.min(255, Math.max(0, gray + (1 + vibranceFactor) * (data[i] - gray)));
-      data[i + 1] = Math.min(255, Math.max(0, gray + (1 + vibranceFactor) * (data[i + 1] - gray)));
-      data[i + 2] = Math.min(255, Math.max(0, gray + (1 + vibranceFactor) * (data[i + 2] - gray)));
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const cs = max > 0 ? (max - min) / max : 0; // current saturation 0..1
+      const boost = f * (1 - cs); // less-saturated pixels boosted more
+      const gray = srgbLuminance(r, g, b);
+      const s = 1 + boost;
+      data[i] = Math.min(255, Math.max(0, gray + (r - gray) * s));
+      data[i + 1] = Math.min(255, Math.max(0, gray + (g - gray) * s));
+      data[i + 2] = Math.min(255, Math.max(0, gray + (b - gray) * s));
     }
+    return imageData;
+  }
 
+  /** Multiplicative, luminance-preserving channel gains in linear (shared by temp/tint). */
+  private static applyChannelGains(
+    imageData: ImageData,
+    rGain: number,
+    gGain: number,
+    bGain: number
+  ): ImageData {
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = SRGB_TO_LINEAR[data[i]];
+      const g = SRGB_TO_LINEAR[data[i + 1]];
+      const b = SRGB_TO_LINEAR[data[i + 2]];
+      const yBefore = linearLuminance(r, g, b);
+      const r2 = r * rGain;
+      const g2 = g * gGain;
+      const b2 = b * bGain;
+      const yAfter = linearLuminance(r2, g2, b2);
+      const s = yAfter > 1e-6 ? yBefore / yAfter : 1; // renormalize brightness
+      data[i] = linearToSrgb8(r2 * s);
+      data[i + 1] = linearToSrgb8(g2 * s);
+      data[i + 2] = linearToSrgb8(b2 * s);
+    }
     return imageData;
   }
 
   private static applyTemperature(imageData: ImageData, temperature: number): ImageData {
-    const data = imageData.data;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      // Warm (positive) adds red/yellow, cool (negative) adds blue
-      data[i] = Math.min(255, Math.max(0, data[i] + temperature * 2.55));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] - temperature * 2.55));
-    }
-
-    return imageData;
+    if (!temperature) return imageData;
+    const t = temperature / 100; // warm raises red / lowers blue, cool the reverse
+    return this.applyChannelGains(imageData, 1 + 0.3 * t, 1, 1 - 0.3 * t);
   }
 
   private static applyTint(imageData: ImageData, tint: number): ImageData {
-    const data = imageData.data;
-    
-    for (let i = 0; i < data.length; i += 4) {
-      // Positive adds magenta, negative adds green
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] - tint * 2.55));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + tint * 1.27));
-    }
-
-    return imageData;
+    if (!tint) return imageData;
+    // Magenta (negative) reduces green; green (positive) raises it.
+    return this.applyChannelGains(imageData, 1, 1 - 0.25 * (tint / 100), 1);
   }
 
   private static applyClarity(imageData: ImageData, amount: number): ImageData {
-    // Clarity is midtone contrast enhancement using local contrast
-    const blurred = RasterOps.gaussianBlur(imageData, 10);
+    if (!amount) return imageData;
+    // Local midtone contrast: unsharp mask on the LUMINANCE channel (large radius), weighted
+    // toward midtones, added equally to RGB to preserve color.
+    const strength = (amount / 100) * 0.8;
+    const blurred = RasterOps.gaussianBlur(
+      new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height),
+      12
+    );
     const data = imageData.data;
-    const blurredData = blurred.data;
-    const output = new Uint8ClampedArray(data.length);
-
-    const strength = amount / 100;
-
+    const bd = blurred.data;
     for (let i = 0; i < data.length; i += 4) {
-      for (let c = 0; c < 3; c++) {
-        const localContrast = data[i + c] - blurredData[i + c];
-        output[i + c] = Math.min(255, Math.max(0, data[i + c] + localContrast * strength));
-      }
-      output[i + 3] = data[i + 3];
+      const yo = srgbLuminance(data[i], data[i + 1], data[i + 2]);
+      const yb = srgbLuminance(bd[i], bd[i + 1], bd[i + 2]);
+      const yn = yo / 255;
+      const mid = 1 - Math.abs(2 * yn - 1); // 0 near black/white, 1 at midtone
+      const add = (yo - yb) * strength * mid;
+      data[i] = Math.min(255, Math.max(0, data[i] + add));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + add));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + add));
     }
-
-    return new ImageData(output, imageData.width, imageData.height);
+    return imageData;
   }
 
   private static applyDehaze(imageData: ImageData, amount: number): ImageData {

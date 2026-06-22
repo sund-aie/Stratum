@@ -341,8 +341,17 @@ const AdjSlider: React.FC<{ label: string; min: number; max: number; value: numb
   value,
   onChange,
 }) => {
-  const begin = () => getStore().beginHistory(`Adjust ${label}`);
-  const commit = () => getStore().commitHistory();
+  const { engine } = useApp();
+  // Drag = one history step + reduced-resolution preview for responsiveness; commit on release
+  // restores full-resolution compositing.
+  const begin = () => {
+    getStore().beginHistory(`Adjust ${label}`);
+    engine.setPreviewMode(true);
+  };
+  const commit = () => {
+    engine.setPreviewMode(false);
+    getStore().commitHistory();
+  };
   return (
     <div className="row" style={{ gap: 6 }}>
       <span className="label" style={{ width: 70 }}>{label}</span>

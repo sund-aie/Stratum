@@ -4,6 +4,7 @@
  */
 
 import type { RGBAColor, BlendMode } from '../../types';
+import { SRGB_TO_LINEAR, linearToSrgb8, srgbLuminance } from './ColorMath';
 
 // ============================================================================
 // BLEND MODE IMPLEMENTATIONS
@@ -258,15 +259,14 @@ export class RasterOps {
    * Apply exposure adjustment
    */
   static applyExposure(imageData: ImageData, exposure: number): ImageData {
+    if (!exposure) return imageData; // 0 EV is a no-op
     const data = imageData.data;
-    const factor = Math.pow(2, exposure);
-
+    const mul = Math.pow(2, exposure); // EV in linear light
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, data[i] * factor));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor));
+      data[i] = linearToSrgb8(SRGB_TO_LINEAR[data[i]] * mul);
+      data[i + 1] = linearToSrgb8(SRGB_TO_LINEAR[data[i + 1]] * mul);
+      data[i + 2] = linearToSrgb8(SRGB_TO_LINEAR[data[i + 2]] * mul);
     }
-
     return imageData;
   }
 
@@ -274,15 +274,21 @@ export class RasterOps {
    * Apply contrast adjustment
    */
   static applyContrast(imageData: ImageData, contrast: number): ImageData {
+    if (!contrast) return imageData;
     const data = imageData.data;
-    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
+    // Smooth pivot around mid-gray in sRGB-normalized space (no hard clipping until the end).
+    const f = contrast / 100;
+    const slope = 1 + f;
+    const adj = (c: number) => {
+      const n = (c / 255 - 0.5) * slope + 0.5;
+      const v = Math.round(n * 255);
+      return v < 0 ? 0 : v > 255 ? 255 : v;
+    };
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
-      data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
-      data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128));
+      data[i] = adj(data[i]);
+      data[i + 1] = adj(data[i + 1]);
+      data[i + 2] = adj(data[i + 2]);
     }
-
     return imageData;
   }
 
@@ -290,16 +296,15 @@ export class RasterOps {
    * Apply saturation adjustment
    */
   static applySaturation(imageData: ImageData, saturation: number): ImageData {
+    if (!saturation) return imageData;
     const data = imageData.data;
-    const factor = 1 + saturation / 100;
-
+    const s = 1 + saturation / 100; // luminance-preserving
     for (let i = 0; i < data.length; i += 4) {
-      const gray = 0.2989 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      data[i] = Math.min(255, Math.max(0, gray + factor * (data[i] - gray)));
-      data[i + 1] = Math.min(255, Math.max(0, gray + factor * (data[i + 1] - gray)));
-      data[i + 2] = Math.min(255, Math.max(0, gray + factor * (data[i + 2] - gray)));
+      const gray = srgbLuminance(data[i], data[i + 1], data[i + 2]);
+      data[i] = Math.min(255, Math.max(0, gray + (data[i] - gray) * s));
+      data[i + 1] = Math.min(255, Math.max(0, gray + (data[i + 1] - gray) * s));
+      data[i + 2] = Math.min(255, Math.max(0, gray + (data[i + 2] - gray) * s));
     }
-
     return imageData;
   }
 
